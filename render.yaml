@@ -3,7 +3,7 @@ services:
     name: whatsapp4etc-api
     runtime: docker
     plan: starter
-    region: sao
+    region: virginia
     rootDir: api
     dockerfilePath: ./Dockerfile
     autoDeploy: true
@@ -46,6 +46,6 @@ services:
   - type: keyvalue
     name: whatsapp4etc-redis
     plan: free
-    region: sao
+    region: virginia
     ipAllowList: []
     maxmemoryPolicy: noeviction
