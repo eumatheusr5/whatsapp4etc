@@ -20,6 +20,7 @@ import { getSupabaseAdmin } from '../lib/supabase-admin';
 import { logger } from '../lib/logger';
 import { RealtimeGateway } from '../modules/realtime/realtime.gateway';
 import { EventHandlersService } from './event-handlers.service';
+import { ContactsService } from '../modules/contacts/contacts.service';
 
 interface ManagedSession {
   id: string;
@@ -39,6 +40,8 @@ export class SessionManager implements OnApplicationBootstrap, OnApplicationShut
     private readonly realtime: RealtimeGateway,
     @Inject(forwardRef(() => EventHandlersService))
     private readonly eventHandlers: EventHandlersService,
+    @Inject(forwardRef(() => ContactsService))
+    private readonly contacts: ContactsService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -200,6 +203,13 @@ export class SessionManager implements OnApplicationBootstrap, OnApplicationShut
     if (update.connection === 'open') {
       const me = session.sock.user;
       const phoneNumber = me?.id ? me.id.split(':')[0].split('@')[0] : null;
+      // Nome do PERFIL PROPRIO da instancia. Usado pelo ContactsService para
+      // descartar pushName recebido em mensagens fromMe (ex: status de pedido
+      // enviado por sistema externo via essa mesma conta) — assim o nome do
+      // cliente nunca eh contaminado pelo nome da empresa.
+      const selfPushName = (me as { name?: string } | undefined)?.name ?? null;
+      const selfVerifiedName =
+        (me as { verifiedName?: string } | undefined)?.verifiedName ?? null;
       session.status = 'connected';
       session.reconnectAttempt = 0;
       await this.updateInstanceStatus(instanceId, 'connected', {
@@ -207,11 +217,14 @@ export class SessionManager implements OnApplicationBootstrap, OnApplicationShut
         last_connected_at: new Date().toISOString(),
         phone_number: phoneNumber,
         disconnect_reason: null,
+        self_push_name: selfPushName,
+        self_verified_name: selfVerifiedName,
       });
       await this.recordHealth(instanceId, 'connected', { phoneNumber });
       this.realtime.emitAll('instance:connected', { instanceId, phoneNumber });
       this.realtime.emitAll('instance:status_changed', { instanceId, status: 'connected' });
-      this.log.info({ instanceId, phoneNumber }, 'instância conectada');
+      this.contacts.invalidateSelfNames(instanceId);
+      this.log.info({ instanceId, phoneNumber, selfPushName }, 'instância conectada');
     }
 
     if (update.connection === 'close') {

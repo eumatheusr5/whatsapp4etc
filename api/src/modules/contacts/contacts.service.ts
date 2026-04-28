@@ -18,6 +18,58 @@ export class ContactsService {
   private readonly log = logger.child({ component: 'ContactsService' });
   private readonly inflightAvatars = new Set<string>();
 
+  /** Cache de nomes proprios por instancia, para descartar pushName proprio. */
+  private readonly selfNamesByInstance = new Map<
+    string,
+    { selfPushName: string | null; selfVerifiedName: string | null; loadedAt: number }
+  >();
+  private static readonly SELF_NAME_TTL_MS = 5 * 60_000;
+
+  private async getSelfNames(
+    instanceId: string,
+  ): Promise<{ selfPushName: string | null; selfVerifiedName: string | null }> {
+    const cached = this.selfNamesByInstance.get(instanceId);
+    if (cached && Date.now() - cached.loadedAt < ContactsService.SELF_NAME_TTL_MS) {
+      return { selfPushName: cached.selfPushName, selfVerifiedName: cached.selfVerifiedName };
+    }
+    const { data } = await getSupabaseAdmin()
+      .from('instances')
+      .select('self_push_name, self_verified_name')
+      .eq('id', instanceId)
+      .maybeSingle<{ self_push_name: string | null; self_verified_name: string | null }>();
+    const value = {
+      selfPushName: data?.self_push_name ?? null,
+      selfVerifiedName: data?.self_verified_name ?? null,
+      loadedAt: Date.now(),
+    };
+    this.selfNamesByInstance.set(instanceId, value);
+    return { selfPushName: value.selfPushName, selfVerifiedName: value.selfVerifiedName };
+  }
+
+  /** Invalida o cache de nomes proprios (chame ao reconectar / renomear instancia). */
+  invalidateSelfNames(instanceId: string): void {
+    this.selfNamesByInstance.delete(instanceId);
+  }
+
+  /**
+   * Verdadeiro se o pushName recebido eh o nome proprio da instancia (perfil
+   * da empresa) — significa que a mensagem nao foi escrita pelo CLIENTE e sim
+   * pelo nosso WhatsApp (ex: status de pedido enviado por sistema externo).
+   * Nesses casos NAO atualizamos o push_name do contato.
+   */
+  private isSelfName(
+    candidate: string,
+    selfNames: { selfPushName: string | null; selfVerifiedName: string | null },
+  ): boolean {
+    const norm = (s: string | null | undefined) =>
+      (s ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const c = norm(candidate);
+    if (!c) return false;
+    const p = norm(selfNames.selfPushName);
+    const v = norm(selfNames.selfVerifiedName);
+    return (!!p && c === p) || (!!v && c === v);
+  }
+
   /**
    * Insere ou atualiza o contato. Atualiza pushName a cada chamada.
    * Se a foto está velha (>7 dias) ou nunca foi baixada, dispara fetch assíncrono.
@@ -27,9 +79,23 @@ export class ContactsService {
     const supabase = getSupabaseAdmin();
     const phoneNumber = this.extractPhone(jid);
 
+    // Defesa em profundidade: descartar pushName que coincida com o proprio
+    // perfil da instancia (mesmo se chegou aqui por algum caminho).
+    let cleanPushName: string | null = pushName ?? null;
+    if (cleanPushName) {
+      const selfNames = await this.getSelfNames(instanceId);
+      if (this.isSelfName(cleanPushName, selfNames)) {
+        this.log.debug(
+          { instanceId, jid, dropped: cleanPushName },
+          'pushName descartado: igual ao perfil da instancia',
+        );
+        cleanPushName = null;
+      }
+    }
+
     const { data: existing, error: selErr } = await supabase
       .from('contacts')
-      .select('id, push_name, avatar_url, avatar_updated_at')
+      .select('id, push_name, custom_name, avatar_url, avatar_updated_at')
       .eq('instance_id', instanceId)
       .eq('jid', jid)
       .maybeSingle();
@@ -46,7 +112,7 @@ export class ContactsService {
         .insert({
           instance_id: instanceId,
           jid,
-          push_name: pushName ?? null,
+          push_name: cleanPushName,
           phone_number: phoneNumber,
         })
         .select('id')
@@ -55,10 +121,18 @@ export class ContactsService {
       contactId = created.id;
     } else {
       contactId = existing.id;
-      if (pushName && pushName !== existing.push_name) {
+      // So atualiza push_name se for diferente E nao for o nome proprio.
+      // Nunca toca em custom_name (definido manualmente pelo atendente).
+      if (cleanPushName && cleanPushName !== existing.push_name) {
         await supabase
           .from('contacts')
-          .update({ push_name: pushName, phone_number: phoneNumber })
+          .update({ push_name: cleanPushName, phone_number: phoneNumber })
+          .eq('id', contactId);
+      } else if (!existing.push_name && phoneNumber) {
+        // Atualiza apenas phone_number quando contato existe mas estava sem.
+        await supabase
+          .from('contacts')
+          .update({ phone_number: phoneNumber })
           .eq('id', contactId);
       }
     }
