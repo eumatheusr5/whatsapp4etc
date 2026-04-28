@@ -27,7 +27,7 @@ export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect
         : undefined);
 
     try {
-      const user = this.jwt.verify(token ?? '');
+      const user = await this.jwt.verify(token ?? '');
       socket.user = user;
       this.addOnline(user.id, socket.id);
       socket.join(`user:${user.id}`);

@@ -13,7 +13,7 @@ declare module 'express-serve-static-core' {
 export class JwtAuthGuard implements CanActivate {
   constructor(private readonly jwt: JwtAuthService) {}
 
-  canActivate(context: ExecutionContext): boolean {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
     const header = req.headers['authorization'];
     if (!header || typeof header !== 'string') {
@@ -31,7 +31,7 @@ export class JwtAuthGuard implements CanActivate {
         HttpStatus.UNAUTHORIZED,
       );
     }
-    req.user = this.jwt.verify(token);
+    req.user = await this.jwt.verify(token);
     return true;
   }
 }
