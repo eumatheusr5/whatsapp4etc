@@ -9,6 +9,7 @@ import {
   Archive,
   Trash2,
   UserCheck,
+  StickyNote,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -92,6 +93,35 @@ export function ConversationView({
     },
   });
 
+  // Tags e nº de observações do contato — para mostrar na sub-bar do header.
+  const { data: contactTags = [] } = useQuery<Array<{ id: string; name: string; color: string }>>({
+    queryKey: ['conversation-tags', conv?.contact_id],
+    enabled: !!conv?.contact_id,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('contact_tags')
+        .select('tags(id,name,color)')
+        .eq('contact_id', conv!.contact_id);
+      return ((data ?? []) as Array<{
+        tags: { id: string; name: string; color: string } | { id: string; name: string; color: string }[] | null;
+      }>)
+        .map((r) => (Array.isArray(r.tags) ? r.tags[0] : r.tags))
+        .filter((t): t is { id: string; name: string; color: string } => !!t);
+    },
+  });
+
+  const { data: notesCount = 0 } = useQuery<number>({
+    queryKey: ['conversation-notes-count', conv?.contact_id],
+    enabled: !!conv?.contact_id,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('contact_notes')
+        .select('id', { count: 'exact', head: true })
+        .eq('contact_id', conv!.contact_id);
+      return count ?? 0;
+    },
+  });
+
   useEffect(() => {
     if (!conversationId) return;
     void api.post(`/conversations/${conversationId}/read`).catch(() => undefined);
@@ -151,15 +181,20 @@ export function ConversationView({
   const isLockedByOther = !!conv.assigned_to && !isMine;
   const presenceText = translatePresence(conv.contact.presence);
 
+  const hasSubBar =
+    contactTags.length > 0 ||
+    notesCount > 0 ||
+    isLockedByOther ||
+    !isMine; // mostra Assumir
   return (
-    <div className="h-full flex bg-bg">
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="h-16 px-3 sm:px-4 flex items-center gap-2 sm:gap-3 border-b border-border bg-surface">
+    <div className="h-full flex bg-bg min-h-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        {/* Header principal — compacto */}
+        <header className="h-14 px-2 sm:px-4 flex items-center gap-2 border-b border-border bg-surface shrink-0">
           {onBack && (
             <button
               onClick={onBack}
-              className="md:hidden w-9 h-9 rounded-md text-text-muted hover:bg-surface-2 inline-flex items-center justify-center"
+              className="md:hidden w-9 h-9 rounded-md text-text-muted hover:bg-surface-2 inline-flex items-center justify-center shrink-0"
               aria-label="Voltar"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -169,69 +204,68 @@ export function ConversationView({
             onClick={onToggleDetails}
             className="flex items-center gap-3 flex-1 min-w-0 hover:opacity-80 text-left"
           >
-            <Avatar src={conv.contact.avatar_url} name={name} size="md" status={conv.contact.presence === 'available' ? 'online' : null} />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-text truncate">{name}</span>
-                {isMine && <Badge tone="success" size="xs">Sua</Badge>}
+            <Avatar
+              src={conv.contact.avatar_url}
+              name={name}
+              size="md"
+              status={conv.contact.presence === 'available' ? 'online' : null}
+            />
+            <div className="min-w-0 flex-1">
+              <div className="font-semibold text-text truncate text-[15px] leading-tight">
+                {name}
               </div>
-              <div className="text-xs text-text-muted truncate flex items-center gap-1.5">
-                {phoneFmt && <span>{phoneFmt}</span>}
-                {presenceText && (
+              <div className="text-[11px] text-text-muted truncate leading-tight mt-0.5">
+                {presenceText &&
+                (conv.contact.presence === 'composing' || conv.contact.presence === 'recording') ? (
+                  <span className="text-accent font-medium">{presenceText}…</span>
+                ) : (
                   <>
-                    <span className="text-text-subtle">·</span>
-                    <span className={conv.contact.presence === 'composing' || conv.contact.presence === 'recording' ? 'text-accent font-medium' : ''}>
-                      {presenceText}
-                    </span>
+                    {phoneFmt && <span>{phoneFmt}</span>}
+                    <span className="text-text-subtle mx-1">·</span>
+                    <span className="truncate">{conv.instance.name}</span>
                   </>
                 )}
-                <span className="text-text-subtle">·</span>
-                <span className="truncate">{conv.instance.name}</span>
               </div>
             </div>
           </button>
 
-          <div className="flex items-center gap-1 sm:gap-2">
-            {isLockedByOther ? (
-              <Badge tone="warning" size="sm">
-                <Lock className="w-3 h-3" />
-                <span className="hidden sm:inline">{conv.assignee?.full_name}</span>
-              </Badge>
-            ) : isMine ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                iconLeft={<Unlock className="w-3.5 h-3.5" />}
-                onClick={() => release.mutate()}
-                loading={release.isPending}
-              >
-                <span className="hidden sm:inline">Liberar</span>
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                size="sm"
-                iconLeft={<UserCheck className="w-3.5 h-3.5" />}
-                onClick={() => assign.mutate()}
-                loading={assign.isPending}
-              >
-                <span className="hidden sm:inline">Assumir</span>
-              </Button>
-            )}
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
               onClick={onToggleDetails}
-              className={`w-9 h-9 rounded-md inline-flex items-center justify-center ${showDetails ? 'bg-accent-soft text-accent' : 'text-text-muted hover:bg-surface-2'}`}
+              className={`w-9 h-9 rounded-md inline-flex items-center justify-center ${
+                showDetails ? 'bg-accent-soft text-accent' : 'text-text-muted hover:bg-surface-2'
+              }`}
               aria-label="Detalhes"
             >
               <Info className="w-5 h-5" />
             </button>
             <DropdownMenu
+              align="right"
               trigger={
                 <span className="w-9 h-9 rounded-md text-text-muted hover:bg-surface-2 inline-flex items-center justify-center">
                   <MoreVertical className="w-5 h-5" />
                 </span>
               }
               items={[
+                ...(isMine
+                  ? [
+                      {
+                        id: 'release',
+                        label: 'Liberar conversa',
+                        icon: <Unlock className="w-4 h-4" />,
+                        onClick: () => release.mutate(),
+                      },
+                    ]
+                  : isLockedByOther
+                    ? []
+                    : [
+                        {
+                          id: 'assign',
+                          label: 'Assumir conversa',
+                          icon: <UserCheck className="w-4 h-4" />,
+                          onClick: () => assign.mutate(),
+                        },
+                      ]),
                 {
                   id: 'archive',
                   label: 'Arquivar conversa',
@@ -251,7 +285,66 @@ export function ConversationView({
           </div>
         </header>
 
-        <MessagesList conversationId={conversationId} contactJid={conv.contact.jid} />
+        {/* Sub-bar com tags / observações / status de atribuição — sempre visível e compacta */}
+        {hasSubBar && (
+          <div className="px-3 sm:px-4 py-1.5 border-b border-border bg-surface/60 flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
+            {isLockedByOther ? (
+              <Badge tone="warning" size="sm">
+                <Lock className="w-3 h-3" />
+                Em atendimento por {conv.assignee?.full_name}
+              </Badge>
+            ) : isMine ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                iconLeft={<Unlock className="w-3.5 h-3.5" />}
+                onClick={() => release.mutate()}
+                loading={release.isPending}
+              >
+                Liberar
+              </Button>
+            ) : (
+              <Button
+                variant="primary"
+                size="sm"
+                iconLeft={<UserCheck className="w-3.5 h-3.5" />}
+                onClick={() => assign.mutate()}
+                loading={assign.isPending}
+              >
+                Assumir
+              </Button>
+            )}
+
+            {contactTags.length > 0 && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                {contactTags.map((t) => (
+                  <span
+                    key={t.id}
+                    className="inline-flex items-center px-2 h-5 text-[11px] font-medium rounded text-white whitespace-nowrap"
+                    style={{ background: t.color || 'rgb(var(--accent))' }}
+                  >
+                    {t.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {notesCount > 0 && (
+              <button
+                onClick={onToggleDetails}
+                className="inline-flex items-center gap-1 px-2 h-5 text-[11px] rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 hover:opacity-80 whitespace-nowrap shrink-0"
+                title="Ver observações"
+              >
+                <StickyNote className="w-3 h-3" />
+                {notesCount} observa{notesCount > 1 ? 'ções' : 'ção'}
+              </button>
+            )}
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 flex flex-col">
+          <MessagesList conversationId={conversationId} contactJid={conv.contact.jid} />
+        </div>
         <Composer
           conversationId={conversationId}
           locked={isLockedByOther}

@@ -5,6 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { cn, formatTime } from '../../lib/format';
 import { useLightbox } from '../../components/LightboxProvider';
+import { FormattedText } from '../../components/ui';
 
 export interface MessageRow {
   id: string;
@@ -178,7 +179,11 @@ function ReactionPicker({ onPick }: { onPick: (e: string) => void }) {
 function MessageContent({ msg }: { msg: MessageRow }) {
   const lightbox = useLightbox();
   if (msg.type === 'text') {
-    return <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>;
+    return (
+      <p className="text-sm break-words">
+        <FormattedText text={msg.body} />
+      </p>
+    );
   }
   if (msg.type === 'image' && msg.media_url) {
     return (
@@ -193,7 +198,11 @@ function MessageContent({ msg }: { msg: MessageRow }) {
             })
           }
         />
-        {msg.body && <p className="text-sm mt-1 whitespace-pre-wrap break-words">{msg.body}</p>}
+        {msg.body && (
+          <p className="text-sm mt-1 break-words">
+            <FormattedText text={msg.body} />
+          </p>
+        )}
       </div>
     );
   }
@@ -201,7 +210,11 @@ function MessageContent({ msg }: { msg: MessageRow }) {
     return (
       <div>
         <video src={msg.media_url} controls className="rounded max-w-full max-h-80" />
-        {msg.body && <p className="text-sm mt-1 whitespace-pre-wrap break-words">{msg.body}</p>}
+        {msg.body && (
+          <p className="text-sm mt-1 break-words">
+            <FormattedText text={msg.body} />
+          </p>
+        )}
       </div>
     );
   }

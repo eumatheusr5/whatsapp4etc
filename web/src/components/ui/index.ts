@@ -10,3 +10,4 @@ export * from './DropdownMenu';
 export * from './Tooltip';
 export * from './Skeleton';
 export * from './EmptyState';
+export * from './FormattedText';

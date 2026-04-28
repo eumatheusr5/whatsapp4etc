@@ -62,7 +62,7 @@ interface MediaItem {
   media_url: string | null;
   body: string | null;
   wa_timestamp: string;
-  duration_sec: number | null;
+  media_duration_seconds: number | null;
 }
 
 type SubTab = 'info' | 'media' | 'audio' | 'docs' | 'history';
@@ -145,7 +145,7 @@ export function ContactDetailsPanel({ contactId, conversationId, onClose, varian
       if (convIds.length === 0) return [];
       const { data } = await supabase
         .from('messages')
-        .select('id, type, media_path, media_url, body, wa_timestamp, duration_sec')
+        .select('id, type, media_path, media_url, body, wa_timestamp, media_duration_seconds')
         .in('conversation_id', convIds)
         .in('type', wantedTypes)
         .order('wa_timestamp', { ascending: false })
@@ -246,11 +246,11 @@ export function ContactDetailsPanel({ contactId, conversationId, onClose, varian
   return (
     <aside
       className={cn(
-        'bg-surface flex flex-col h-full',
+        'bg-surface flex flex-col h-full min-h-0',
         variant === 'panel' && 'w-[340px] shrink-0 border-l border-border',
       )}
     >
-      <div className="h-14 px-4 flex items-center justify-between border-b border-border">
+      <div className="h-14 px-4 flex items-center justify-between border-b border-border shrink-0">
         <h3 className="font-semibold text-text">Detalhes do contato</h3>
         {onClose && (
           <button
@@ -263,7 +263,7 @@ export function ContactDetailsPanel({ contactId, conversationId, onClose, varian
         )}
       </div>
 
-      <div className="px-4 py-5 flex flex-col items-center text-center border-b border-border">
+      <div className="px-4 py-5 flex flex-col items-center text-center border-b border-border shrink-0">
         <Avatar src={contact.avatar_url} name={displayName} size="2xl" />
         <div className="mt-3 w-full">
           {editingName ? (
@@ -302,7 +302,7 @@ export function ContactDetailsPanel({ contactId, conversationId, onClose, varian
         )}
       </div>
 
-      <div className="px-2 pt-2 border-b border-border">
+      <div className="px-2 pt-2 border-b border-border shrink-0">
         <Tabs
           variant="underline"
           size="sm"
@@ -319,9 +319,9 @@ export function ContactDetailsPanel({ contactId, conversationId, onClose, varian
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
         {tab === 'info' && (
-          <div className="p-4 space-y-5">
+          <div className="p-4 pb-8 space-y-5">
             <Section title="Tags">
               {tags.length === 0 ? (
                 <p className="text-xs text-text-subtle">Nenhuma tag cadastrada. Crie em Configurações.</p>
@@ -536,7 +536,9 @@ function AudioList({ items }: { items: MediaItem[] }) {
           <div className="flex items-center gap-2 text-xs text-text-muted">
             <Mic className="w-3.5 h-3.5 text-accent" />
             <span>{m.type === 'ptt' ? 'Mensagem de voz' : 'Áudio'}</span>
-            {m.duration_sec ? <Badge tone="neutral" size="xs">{m.duration_sec}s</Badge> : null}
+            {m.media_duration_seconds ? (
+              <Badge tone="neutral" size="xs">{m.media_duration_seconds}s</Badge>
+            ) : null}
             <span className="ml-auto text-text-subtle">{formatRelative(m.wa_timestamp)}</span>
           </div>
           {m.media_url && (

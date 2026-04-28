@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, QrCode, Power, RefreshCw, Trash2, LogOut, Smartphone } from 'lucide-react';
+import { Plus, QrCode, Power, RefreshCw, Trash2, LogOut, Smartphone, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
@@ -32,6 +32,8 @@ export function InstancesListTab() {
   const [showQrFor, setShowQrFor] = useState<string | null>(null);
   const [qrData, setQrData] = useState<Record<string, string>>({});
   const [confirm, setConfirm] = useState<{ kind: 'logout' | 'remove'; inst: Instance } | null>(null);
+  const [editing, setEditing] = useState<Instance | null>(null);
+  const [editName, setEditName] = useState('');
 
   const { data: instances = [], isLoading } = useQuery<Instance[]>({
     queryKey: ['instances'],
@@ -110,6 +112,17 @@ export function InstancesListTab() {
     },
   });
 
+  const rename = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      api.patch(`/instances/${id}`, { name }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['instances'] });
+      setEditing(null);
+      toast.success('Nome atualizado');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <>
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
@@ -162,6 +175,18 @@ export function InstancesListTab() {
                       </Badge>
                     </div>
                   </div>
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-text-muted shrink-0"
+                    onClick={() => {
+                      setEditing(inst);
+                      setEditName(inst.name);
+                    }}
+                    title="Renomear"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
                 </div>
 
                 {showQrFor === inst.id && qr && inst.status === 'qr' && (
@@ -260,6 +285,52 @@ export function InstancesListTab() {
             <Input name="name" autoFocus placeholder="Ex: Vendas SP" />
           </Field>
         </form>
+      </Dialog>
+
+      <Dialog
+        open={!!editing}
+        onClose={() => setEditing(null)}
+        size="sm"
+        title="Renomear número"
+        description="Atualize o nome para identificar melhor este número."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setEditing(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                const trimmed = editName.trim();
+                if (editing && trimmed && trimmed !== editing.name) {
+                  rename.mutate({ id: editing.id, name: trimmed });
+                } else {
+                  setEditing(null);
+                }
+              }}
+              loading={rename.isPending}
+            >
+              Salvar
+            </Button>
+          </>
+        }
+      >
+        <div className="p-4 sm:p-5">
+          <Field label="Nome do número">
+            <Input
+              autoFocus
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const trimmed = editName.trim();
+                  if (editing && trimmed && trimmed !== editing.name) {
+                    rename.mutate({ id: editing.id, name: trimmed });
+                  }
+                }
+              }}
+            />
+          </Field>
+        </div>
       </Dialog>
 
       {confirm && (

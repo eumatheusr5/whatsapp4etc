@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -17,6 +18,10 @@ import { InstancesService } from './instances.service';
 import { ZodValidationPipe } from '../../lib/zod-pipe';
 
 const CreateSchema = z.object({
+  name: z.string().min(1).max(80),
+});
+
+const UpdateSchema = z.object({
   name: z.string().min(1).max(80),
 });
 
@@ -41,6 +46,15 @@ export class InstancesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.svc.create({ name: body.name, userId: user.id });
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(UpdateSchema)) body: z.infer<typeof UpdateSchema>,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.svc.update(id, { name: body.name, userId: user.id });
   }
 
   @Post(':id/connect')

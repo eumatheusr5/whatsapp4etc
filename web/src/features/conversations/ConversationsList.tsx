@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, MessageCircle, Inbox } from 'lucide-react';
+import { Search, MessageCircle, Inbox, StickyNote } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { cn, formatPhone, formatTime } from '../../lib/format';
@@ -24,6 +24,8 @@ interface ConversationListItem {
   } | null;
   instances: { name: string } | null;
   assignee?: { full_name: string } | null;
+  tags?: Array<{ id: string; name: string; color: string }>;
+  notes_count?: number;
 }
 
 type FilterId = 'all' | 'unread' | 'mine' | 'unassigned';
@@ -61,12 +63,50 @@ export function ConversationsList({ selectedId }: { selectedId?: string }) {
           assignee?: ConversationListItem['assignee'] | ConversationListItem['assignee'][];
         }
       >;
-      return rows.map((r) => ({
+      const list = rows.map((r) => ({
         ...r,
         contacts: Array.isArray(r.contacts) ? r.contacts[0] ?? null : r.contacts,
         instances: Array.isArray(r.instances) ? r.instances[0] ?? null : r.instances,
         assignee: Array.isArray(r.assignee) ? r.assignee[0] ?? null : r.assignee,
       })) as ConversationListItem[];
+
+      // Carrega tags e nº de notas dos contatos visíveis (1 query cada, simples e rápido).
+      const contactIds = list.map((c) => c.contact_id).filter(Boolean);
+      if (contactIds.length === 0) return list;
+
+      const [{ data: tagRows }, { data: noteRows }] = await Promise.all([
+        supabase
+          .from('contact_tags')
+          .select('contact_id, tags(id,name,color)')
+          .in('contact_id', contactIds),
+        supabase
+          .from('contact_notes')
+          .select('contact_id')
+          .in('contact_id', contactIds),
+      ]);
+
+      const tagsByContact = new Map<string, Array<{ id: string; name: string; color: string }>>();
+      for (const r of (tagRows ?? []) as Array<{
+        contact_id: string;
+        tags: { id: string; name: string; color: string } | { id: string; name: string; color: string }[] | null;
+      }>) {
+        const t = Array.isArray(r.tags) ? r.tags[0] : r.tags;
+        if (!t) continue;
+        const arr = tagsByContact.get(r.contact_id) ?? [];
+        arr.push(t);
+        tagsByContact.set(r.contact_id, arr);
+      }
+
+      const notesByContact = new Map<string, number>();
+      for (const r of (noteRows ?? []) as Array<{ contact_id: string }>) {
+        notesByContact.set(r.contact_id, (notesByContact.get(r.contact_id) ?? 0) + 1);
+      }
+
+      return list.map((c) => ({
+        ...c,
+        tags: tagsByContact.get(c.contact_id) ?? [],
+        notes_count: notesByContact.get(c.contact_id) ?? 0,
+      }));
     },
   });
 
@@ -226,9 +266,28 @@ function ConversationItem({
             </span>
             {conv.unread_count > 0 && <CountBadge count={conv.unread_count} />}
           </div>
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-1">
-            {conv.instances?.name && (
-              <span className="text-[10px] text-text-subtle truncate">{conv.instances.name}</span>
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 mt-1">
+            {conv.tags?.slice(0, 3).map((t) => (
+              <span
+                key={t.id}
+                className="inline-flex items-center px-1.5 h-4 text-[10px] font-medium rounded text-white"
+                style={{ background: t.color || 'rgb(var(--accent))' }}
+                title={t.name}
+              >
+                {t.name}
+              </span>
+            ))}
+            {conv.tags && conv.tags.length > 3 && (
+              <span className="text-[10px] text-text-subtle">+{conv.tags.length - 3}</span>
+            )}
+            {(conv.notes_count ?? 0) > 0 && (
+              <span
+                className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400"
+                title={`${conv.notes_count} observação${conv.notes_count! > 1 ? 'es' : ''}`}
+              >
+                <StickyNote className="w-3 h-3" />
+                {conv.notes_count}
+              </span>
             )}
             {isLockedByOther && (
               <Badge tone="warning" size="xs">
@@ -236,6 +295,11 @@ function ConversationItem({
               </Badge>
             )}
             {isMine && <Badge tone="success" size="xs">Sua</Badge>}
+            {conv.instances?.name && (
+              <span className="text-[10px] text-text-subtle truncate ml-auto">
+                {conv.instances.name}
+              </span>
+            )}
           </div>
         </div>
       </Link>

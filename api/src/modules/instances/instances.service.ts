@@ -52,6 +52,26 @@ export class InstancesService {
     return data;
   }
 
+  async update(id: string, { name, userId }: { name: string; userId: string }) {
+    const inst = await this.get(id);
+    const supabase = getSupabaseAdmin();
+    const { data, error } = await supabase
+      .from('instances')
+      .update({ name } as never)
+      .eq('id', id)
+      .select('*')
+      .single();
+    if (error || !data) throw error ?? new Error('update vazio');
+    await supabase.from('audit_log').insert({
+      user_id: userId,
+      action: 'instance.update',
+      entity: 'instance',
+      entity_id: id,
+      meta: { previousName: inst.name, newName: name } as never,
+    });
+    return data;
+  }
+
   async connect(id: string, userId: string) {
     await this.get(id);
     await this.sessionManager.start(id);

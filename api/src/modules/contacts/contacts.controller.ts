@@ -31,6 +31,10 @@ const NoteSchema = z.object({
   body: z.string().min(1).max(4000),
 });
 
+const ClearPushNameSchema = z.object({
+  pushName: z.string().min(1).max(120),
+});
+
 @Controller('contacts')
 @UseGuards(JwtAuthGuard)
 export class ContactsController {
@@ -202,6 +206,32 @@ export class ContactsController {
       .eq('contact_id', id);
     if (error) throw error;
     return { ok: true };
+  }
+
+  /**
+   * Limpa o push_name de todos os contatos que foram contaminados por um sistema
+   * externo (ex: bot de status de pedido que envia pelo nosso WhatsApp e carimba
+   * o nome da empresa nos contatos do cliente).
+   * Os contatos voltam a receber o push_name correto na próxima mensagem do cliente.
+   */
+  @Post('clear-pushname')
+  async clearPushName(
+    @CurrentUser() user: AuthUser,
+    @Body(new ZodValidationPipe(ClearPushNameSchema)) body: z.infer<typeof ClearPushNameSchema>,
+  ) {
+    const supabase = getSupabaseAdmin();
+    const { count, error } = await supabase
+      .from('contacts')
+      .update({ push_name: null }, { count: 'exact' })
+      .eq('push_name', body.pushName);
+    if (error) throw error;
+    await supabase.from('audit_log').insert({
+      user_id: user.id,
+      action: 'contact.clear_pushname',
+      entity: 'contact',
+      meta: { pushName: body.pushName, affected: count ?? 0 },
+    } as never);
+    return { ok: true, affected: count ?? 0 };
   }
 
   /**

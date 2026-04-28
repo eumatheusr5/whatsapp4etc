@@ -125,10 +125,14 @@ export class EventHandlersService {
       .maybeSingle();
     if (existingMsg) return;
 
+    // Quando fromMe=true, msg.pushName é o nome do remetente (a EMPRESA), não do cliente.
+    // Apenas atualizamos o push_name do contato com o nome do cliente (mensagens recebidas).
+    // Sistemas externos que enviam pelo WhatsApp da loja (status de pedido, etc) terão
+    // pushName igual ao perfil da empresa — ignoramos para não contaminar o nome do contato.
     const contactId = await this.contacts.upsert({
       instanceId,
       jid: remoteJid,
-      pushName: msg.pushName ?? null,
+      pushName: fromMe ? null : msg.pushName ?? null,
       sock,
     });
 

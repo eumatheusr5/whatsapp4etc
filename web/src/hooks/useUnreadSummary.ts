@@ -16,9 +16,19 @@ export function useUnreadSummary() {
   const qc = useQueryClient();
   const query = useQuery<UnreadSummary>({
     queryKey: ['conversations', 'unread-summary'],
-    queryFn: () => api.get<UnreadSummary>('/conversations/unread-summary'),
+    queryFn: async () => {
+      try {
+        return await api.get<UnreadSummary>('/conversations/unread-summary');
+      } catch {
+        // Tolerante: se o endpoint estiver indisponível (deploy em curso, 404
+        // transitório etc), apenas retorna zero — evita poluir o console e
+        // quebrar o badge.
+        return { count: 0 };
+      }
+    },
     staleTime: 30_000,
     gcTime: 5 * 60_000,
+    retry: false,
   });
 
   useEffect(() => {

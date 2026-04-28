@@ -120,6 +120,29 @@
     padding-top: max(env(safe-area-inset-top), 0px);
   }
 
+  /* Evitar auto-zoom do iOS Safari ao focar em campos:
+     iOS faz zoom quando font-size < 16px. Garantimos 16px no mobile e
+     mantemos o tamanho visual do design via line-height/padding. */
+  @media (max-width: 768px) {
+    input[type='text'],
+    input[type='email'],
+    input[type='password'],
+    input[type='tel'],
+    input[type='url'],
+    input[type='number'],
+    input[type='search'],
+    input:not([type]),
+    textarea,
+    select {
+      font-size: 16px !important;
+    }
+  }
+
+  /* Anti-zoom em duplo-toque (iOS) — sem prejudicar gestures */
+  html {
+    touch-action: manipulation;
+  }
+
   /* Reduced motion */
   @media (prefers-reduced-motion: reduce) {
     * {
