@@ -99,27 +99,39 @@ export class TranscriptionWorker implements OnApplicationBootstrap, OnApplicatio
     let language: string | null = null;
     let provider: 'groq' | 'openai' | null = null;
 
-    if (cfg.GROQ_API_KEY) {
+    if (cfg.OPENAI_API_KEY) {
       try {
-        const result = await this.callGroq(buffer, cfg.GROQ_API_KEY);
+        const result = await this.callOpenAI(buffer, cfg.OPENAI_API_KEY);
         transcript = result.text;
         language = result.language ?? 'pt';
-        provider = 'groq';
+        provider = 'openai';
       } catch (err) {
         const ax = err as AxiosError;
         const status = ax.response?.status;
-        this.log.warn({ status, messageId }, 'Groq falhou, tentando fallback');
-        if (!cfg.OPENAI_API_KEY) {
+        const data = ax.response?.data as { error?: { message?: string } } | undefined;
+        this.log.warn(
+          { status, messageId, openaiError: data?.error?.message },
+          'OpenAI Whisper falhou',
+        );
+        if (cfg.GROQ_API_KEY) {
+          try {
+            const result = await this.callGroq(buffer, cfg.GROQ_API_KEY);
+            transcript = result.text;
+            language = result.language ?? 'pt';
+            provider = 'groq';
+          } catch (err2) {
+            this.log.warn({ err: err2, messageId }, 'Groq fallback também falhou');
+            throw err;
+          }
+        } else {
           throw err;
         }
       }
-    }
-
-    if (!transcript && cfg.OPENAI_API_KEY) {
-      const result = await this.callOpenAI(buffer, cfg.OPENAI_API_KEY);
+    } else if (cfg.GROQ_API_KEY) {
+      const result = await this.callGroq(buffer, cfg.GROQ_API_KEY);
       transcript = result.text;
       language = result.language ?? 'pt';
-      provider = 'openai';
+      provider = 'groq';
     }
 
     if (!transcript) {

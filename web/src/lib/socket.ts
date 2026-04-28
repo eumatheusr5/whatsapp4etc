@@ -14,10 +14,21 @@ export async function getSocket(): Promise<Socket> {
   const token = data.session?.access_token;
   socket = io(API_URL, {
     auth: { token },
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'],
+    upgrade: true,
+    rememberUpgrade: true,
+    withCredentials: true,
+    reconnection: true,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 10_000,
+    timeout: 20_000,
   });
+  if (import.meta.env.DEV) {
+    socket.on('connect', () => console.debug('[socket] connected', socket?.id));
+    socket.on('connect_error', (err) => console.debug('[socket] connect_error', err.message));
+    socket.io.on('reconnect_attempt', (n) => console.debug('[socket] reconnect_attempt', n));
+  }
   return socket;
 }
 

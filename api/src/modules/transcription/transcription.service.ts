@@ -41,7 +41,12 @@ export class TranscriptionService implements OnApplicationShutdown {
   async enqueue(messageId: string): Promise<void> {
     const queue = this.getQueue();
     if (!queue) return;
-    await queue.add('transcribe', { messageId }, { jobId: `msg:${messageId}` });
+    // BullMQ não aceita ':' em jobId customizado, usar '-' para idempotência
+    try {
+      await queue.add('transcribe', { messageId }, { jobId: `msg-${messageId}` });
+    } catch (err) {
+      this.log.warn({ err, messageId }, 'falha ao enfileirar transcrição');
+    }
   }
 
   async onApplicationShutdown(): Promise<void> {

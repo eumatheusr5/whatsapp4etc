@@ -108,7 +108,7 @@ export class SessionManager implements OnApplicationBootstrap, OnApplicationShut
       syncFullHistory: false,
       markOnlineOnConnect: false,
       generateHighQualityLinkPreview: true,
-      shouldIgnoreJid: (jid) => jid.endsWith('@broadcast'),
+      shouldIgnoreJid: (jid) => typeof jid === 'string' && jid.endsWith('@broadcast'),
       logger: logger.child({ baileys: instanceId }) as never,
     });
 
