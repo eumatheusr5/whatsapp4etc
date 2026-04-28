@@ -3,9 +3,11 @@ import {
   WASocket,
   proto,
   WAMessage,
+  WAMessageKey,
   WAMessageStubType,
   downloadMediaMessage,
   jidNormalizedUser,
+  Contact as BaileysContact,
 } from '@whiskeysockets/baileys';
 import { getSupabaseAdmin } from '../lib/supabase-admin';
 import { logger } from '../lib/logger';
@@ -87,6 +89,32 @@ export class EventHandlersService {
       }
     });
 
+    // Sync inicial da agenda ao conectar (vem em chunks com isLatest/progress).
+    // Usado para resolver nome+foto antes do cliente mandar a 1a mensagem.
+    sock.ev.on('messaging-history.set', ({ contacts }) => {
+      try {
+        if (contacts && contacts.length > 0) {
+          this.contacts.ingestSyncedContacts(instanceId, contacts as BaileysContact[]);
+          this.log.debug(
+            { instanceId, count: contacts.length },
+            'history sync: contatos ingestados',
+          );
+        }
+      } catch (err) {
+        this.log.warn({ err, instanceId }, 'falha em messaging-history.set ingest');
+      }
+    });
+
+    sock.ev.on('contacts.upsert', (contacts) => {
+      try {
+        if (contacts && contacts.length > 0) {
+          this.contacts.ingestSyncedContacts(instanceId, contacts as BaileysContact[]);
+        }
+      } catch (err) {
+        this.log.warn({ err, instanceId }, 'falha em contacts.upsert ingest');
+      }
+    });
+
     sock.ev.on('presence.update', async ({ id, presences }) => {
       try {
         await this.onPresenceUpdate(instanceId, id, presences);
@@ -94,6 +122,25 @@ export class EventHandlersService {
         this.log.error({ err, instanceId }, 'erro em presence.update');
       }
     });
+  }
+
+  /**
+   * Converte um WAMessageKey para JID canonico no formato @s.whatsapp.net.
+   *
+   * O WhatsApp passou a entregar `remoteJid` no formato anonimo `<lid>@lid`
+   * em alguns cenarios (Linked Identifier). Nesses casos, o numero real do
+   * cliente vem em `senderPn` (mensagens diretas) ou `participantPn` (grupos).
+   *
+   * Esta funcao garante que sempre trabalhamos com o JID real do telefone,
+   * evitando contatos duplicados (um @lid + um @s.whatsapp.net) e numeros
+   * ilegiveis tipo "+119417857912936".
+   */
+  private toCanonicalJid(key: WAMessageKey): string {
+    const remote = key.remoteJid ?? '';
+    if (!remote.endsWith('@lid')) return jidNormalizedUser(remote);
+    const pn = key.senderPn ?? key.participantPn;
+    if (pn) return jidNormalizedUser(pn);
+    return remote; // ultimo recurso: mantem @lid (sem phone_number sera gravado)
   }
 
   // ===================== MESSAGES UPSERT =====================
@@ -107,11 +154,13 @@ export class EventHandlersService {
     if (msg.message?.protocolMessage) return; // mensagens de protocolo (delete, edit)
     if (msg.messageStubType === WAMessageStubType.CIPHERTEXT) return;
 
-    const remoteJid = jidNormalizedUser(msg.key.remoteJid);
+    // Canonicaliza remoteJid: se vier @lid (anonimo), usa senderPn/participantPn
+    // que carrega o @s.whatsapp.net real do cliente.
+    const remoteJid = this.toCanonicalJid(msg.key);
     const fromMe = !!msg.key.fromMe;
     const senderJid = fromMe
       ? jidNormalizedUser(sock.user?.id ?? '')
-      : jidNormalizedUser(msg.key.participant ?? msg.key.remoteJid);
+      : jidNormalizedUser(msg.key.participant ?? remoteJid);
 
     const isGroup = remoteJid.endsWith('@g.us');
     if (isGroup) return; // Ignoramos grupos por enquanto (mantém escopo do projeto)
@@ -536,14 +585,38 @@ export class EventHandlersService {
   private async onContactUpdate(
     instanceId: string,
     sock: WASocket,
-    upd: { id?: string; name?: string; notify?: string; imgUrl?: string | null },
+    upd: { id?: string; name?: string; notify?: string; verifiedName?: string; imgUrl?: string | null },
   ): Promise<void> {
     if (!upd.id) return;
+    // Ignora updates de @lid: nao identificamos qual eh o jid real aqui.
+    if (upd.id.endsWith('@lid')) return;
     const jid = jidNormalizedUser(upd.id);
+
+    // Tambem ingesta no cache para uso posterior em upsert por 1o contato.
+    this.contacts.ingestSyncedContacts(instanceId, [
+      {
+        id: jid,
+        jid,
+        name: upd.name ?? null,
+        notify: upd.notify ?? null,
+        verifiedName: upd.verifiedName ?? null,
+        imgUrl: typeof upd.imgUrl === 'string' ? upd.imgUrl : null,
+      } as BaileysContact,
+    ]);
+
     const supabase = getSupabaseAdmin();
     const updates: Record<string, unknown> = {};
-    if (upd.name || upd.notify) {
-      updates.push_name = upd.name ?? upd.notify;
+    const candidate = upd.name ?? upd.notify ?? null;
+    if (candidate) {
+      const isSelf = await this.contacts.isSelfNameForInstance(instanceId, candidate);
+      if (!isSelf) {
+        updates.push_name = candidate;
+      } else {
+        this.log.debug(
+          { instanceId, jid, dropped: candidate },
+          'contacts.update push_name descartado: igual ao perfil da instancia',
+        );
+      }
     }
     if (Object.keys(updates).length > 0) {
       await supabase

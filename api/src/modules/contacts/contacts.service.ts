@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { WASocket } from '@whiskeysockets/baileys';
+import { WASocket, jidNormalizedUser, Contact as BaileysContact } from '@whiskeysockets/baileys';
 import axios from 'axios';
 import { getSupabaseAdmin } from '../../lib/supabase-admin';
 import { logger } from '../../lib/logger';
@@ -13,6 +13,13 @@ interface UpsertOpts {
   sock?: WASocket;
 }
 
+interface SyncedContactInfo {
+  name?: string | null;
+  notify?: string | null;
+  verifiedName?: string | null;
+  imgUrl?: string | null;
+}
+
 @Injectable()
 export class ContactsService {
   private readonly log = logger.child({ component: 'ContactsService' });
@@ -24,6 +31,15 @@ export class ContactsService {
     { selfPushName: string | null; selfVerifiedName: string | null; loadedAt: number }
   >();
   private static readonly SELF_NAME_TTL_MS = 5 * 60_000;
+
+  /**
+   * Cache em memoria dos contatos sincronizados (agenda do celular da loja
+   * que o WhatsApp envia em messaging-history.set/contacts.upsert). Usado
+   * SOMENTE para resolver nome+foto quando criamos um contato e nao temos
+   * push_name ainda (caso classico: empresa inicia o contato).
+   * Chave: instanceId -> jid canonico (@s.whatsapp.net) -> info.
+   */
+  private readonly syncedContacts = new Map<string, Map<string, SyncedContactInfo>>();
 
   private async getSelfNames(
     instanceId: string,
@@ -49,6 +65,95 @@ export class ContactsService {
   /** Invalida o cache de nomes proprios (chame ao reconectar / renomear instancia). */
   invalidateSelfNames(instanceId: string): void {
     this.selfNamesByInstance.delete(instanceId);
+  }
+
+  /**
+   * Ingesta a lista de contatos sincronizados pelo Baileys (messaging-history.set
+   * ou contacts.upsert). Atualiza o cache em memoria sem tocar no banco.
+   */
+  ingestSyncedContacts(instanceId: string, contacts: BaileysContact[]): void {
+    if (!contacts || contacts.length === 0) return;
+    let perInstance = this.syncedContacts.get(instanceId);
+    if (!perInstance) {
+      perInstance = new Map();
+      this.syncedContacts.set(instanceId, perInstance);
+    }
+    for (const c of contacts) {
+      const idLike = c.jid ?? c.id;
+      if (!idLike) continue;
+      // Sempre cacheamos pelo @s.whatsapp.net (jid). Se so veio o @lid, ignoramos
+      // pois nao serve para casar com upsert posterior.
+      if (!idLike.endsWith('@s.whatsapp.net')) continue;
+      const key = jidNormalizedUser(idLike);
+      perInstance.set(key, {
+        name: c.name ?? null,
+        notify: c.notify ?? null,
+        verifiedName: c.verifiedName ?? null,
+        imgUrl: typeof c.imgUrl === 'string' ? c.imgUrl : null,
+      });
+    }
+  }
+
+  /** Limpa o cache de contatos sincronizados (chame em logout/banned). */
+  clearSyncedContacts(instanceId: string): void {
+    this.syncedContacts.delete(instanceId);
+  }
+
+  /**
+   * Resolve um pushName candidato para um jid quando nao temos info da
+   * mensagem. Tenta:
+   *   1) cache da agenda sincronizada (notify > verifiedName > name)
+   *   2) sock.getBusinessProfile(jid) -> businessName / description
+   * Filtra valores que coincidem com o nome proprio da instancia (defesa).
+   */
+  async resolvePushNameFor(
+    instanceId: string,
+    jid: string,
+    sock?: WASocket,
+  ): Promise<string | null> {
+    if (!jid.endsWith('@s.whatsapp.net')) return null; // @lid sem fallback util
+    const selfNames = await this.getSelfNames(instanceId);
+    const accept = (v: string | null | undefined): string | null => {
+      const s = (v ?? '').trim();
+      if (!s) return null;
+      if (this.isSelfName(s, selfNames)) return null;
+      return s;
+    };
+
+    // 1) Cache da agenda
+    const cached = this.syncedContacts.get(instanceId)?.get(jid);
+    if (cached) {
+      const fromCache = accept(cached.notify) ?? accept(cached.verifiedName) ?? accept(cached.name);
+      if (fromCache) return fromCache;
+    }
+
+    // 2) Business Profile
+    if (sock) {
+      try {
+        const bp = (await Promise.race([
+          sock.getBusinessProfile(jid),
+          new Promise((resolve) => setTimeout(() => resolve(null), 4000)),
+        ])) as { description?: string; business_hours?: unknown; address?: string } & {
+          businessName?: string;
+        } | null;
+        if (bp) {
+          const candidate =
+            (bp as { businessName?: string }).businessName ?? bp.description ?? null;
+          const fromBp = accept(candidate);
+          if (fromBp) return fromBp;
+        }
+      } catch {
+        // ignora — nem todo numero eh business
+      }
+    }
+
+    return null;
+  }
+
+  /** Helper exposto para o event-handlers reusar o filtro. */
+  async isSelfNameForInstance(instanceId: string, candidate: string): Promise<boolean> {
+    const selfNames = await this.getSelfNames(instanceId);
+    return this.isSelfName(candidate, selfNames);
   }
 
   /**
@@ -103,6 +208,14 @@ export class ContactsService {
     if (selErr) {
       this.log.error({ err: selErr, jid }, 'falha ao consultar contato');
       throw selErr;
+    }
+
+    // Se nao temos push_name da mensagem, tenta resolver via cache da agenda
+    // sincronizada ou Business Profile. Funciona mesmo quando A EMPRESA
+    // inicia o contato e o cliente ainda nao respondeu.
+    if (!cleanPushName) {
+      const resolved = await this.resolvePushNameFor(instanceId, jid, sock);
+      if (resolved) cleanPushName = resolved;
     }
 
     let contactId: string;
@@ -212,7 +325,10 @@ export class ContactsService {
   }
 
   private extractPhone(jid: string): string | null {
-    // Remove sufixo de device (ex: 5511999999999:42@s.whatsapp.net) e id de grupo (ex: 5511999999999-1234567@g.us)
+    // Apenas JIDs do tipo @s.whatsapp.net carregam um telefone real.
+    // @lid eh um identificador anonimo; @g.us eh grupo; etc. Nesses casos
+    // retornamos null para nunca gravar lixo no campo phone_number.
+    if (!jid.endsWith('@s.whatsapp.net')) return null;
     const m = jid.match(/^(\d+)(?:[:\-]\d+)?@/);
     return m ? m[1] : null;
   }

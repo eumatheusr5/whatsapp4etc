@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, CheckCheck, Clock, Smile, Reply, Trash2, Pencil, MoreHorizontal, Smartphone, Languages } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useMutation } from '@tanstack/react-query';
@@ -47,7 +47,14 @@ const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
 export function MessageBubble({ msg, contactJid }: { msg: MessageRow; contactJid: string }) {
   const [showActions, setShowActions] = useState(false);
-  const [showTranscript, setShowTranscript] = useState(false);
+  // Transcricao comeca expandida quando ja estah pronta (UX: usuario ve o
+  // texto direto em vez de precisar clicar para abrir).
+  const [showTranscript, setShowTranscript] = useState(msg.transcript_status === 'done');
+  // Quando a transcricao chega depois (status muda para 'done' via socket),
+  // expande automaticamente.
+  useEffect(() => {
+    if (msg.transcript_status === 'done') setShowTranscript(true);
+  }, [msg.transcript_status]);
 
   void contactJid;
 

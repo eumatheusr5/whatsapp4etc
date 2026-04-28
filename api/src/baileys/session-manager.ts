@@ -240,6 +240,8 @@ export class SessionManager implements OnApplicationBootstrap, OnApplicationShut
       if (isLoggedOut) {
         await session.clear();
         this.sessions.delete(instanceId);
+        this.contacts.clearSyncedContacts(instanceId);
+        this.contacts.invalidateSelfNames(instanceId);
         await this.updateInstanceStatus(instanceId, 'disconnected', {
           last_qr: null,
           last_disconnected_at: new Date().toISOString(),
@@ -252,6 +254,8 @@ export class SessionManager implements OnApplicationBootstrap, OnApplicationShut
 
       if (isBanned) {
         this.sessions.delete(instanceId);
+        this.contacts.clearSyncedContacts(instanceId);
+        this.contacts.invalidateSelfNames(instanceId);
         await this.updateInstanceStatus(instanceId, 'banned', {
           last_disconnected_at: new Date().toISOString(),
           disconnect_reason: reasonText,
