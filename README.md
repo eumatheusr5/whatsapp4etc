@@ -8,10 +8,10 @@ mecânica de assumir/liberar conversa, e suporte completo aos recursos do WhatsA
 
 | Camada | Tecnologia | Plataforma |
 | --- | --- | --- |
-| Frontend | React + Vite + TypeScript + Tailwind + Zustand + React Query + Zod | Vercel |
-| Backend | Node.js + NestJS + TypeScript + Baileys + Pino + Socket.IO + BullMQ | Render (São Paulo) |
+| Frontend | React + Vite + TypeScript + Tailwind + Zustand + React Query + Zod | Vercel (Edge BR) |
+| Backend | Node.js + NestJS + TypeScript + Baileys + Pino + Socket.IO + BullMQ | Fly.io (`gru` São Paulo) |
 | Banco / Auth / Storage / Realtime | Supabase Pro (Postgres 17) | Supabase (sa-east-1) |
-| Fila (transcrição) | Redis | Render Key Value |
+| Fila (transcrição + outbox) | Redis | Upstash via Fly.io |
 | Transcrição | Groq Whisper Large v3 (free) + fallback OpenAI | API externa |
 | Monitoramento | Sentry | Sentry |
 
@@ -44,9 +44,11 @@ cd api ; npm run start:dev
 
 ## Deploy
 
-- **Frontend**: push para `main` -> Vercel deploy automático
-- **Backend**: push para `main` -> Render deploy automático (Docker)
-- **Migrations**: aplicadas via Supabase MCP / CLI
+- **Frontend**: push para `main` → Vercel faz deploy automático
+- **Backend**: push para `main` → GitHub Action `fly-deploy.yml` faz deploy automático no Fly.io (`gru`)
+- **Migrations Supabase**: versionadas em `db/migrations/`, aplicadas via Supabase CLI / MCP
+
+Ver passo a passo completo em [`FLY-DEPLOY.md`](./FLY-DEPLOY.md).
 
 ## Recursos principais
 

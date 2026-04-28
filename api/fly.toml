@@ -1,0 +1,33 @@
+app = "whatsapp4etc-api"
+primary_region = "gru"
+kill_signal = "SIGINT"
+kill_timeout = "30s"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  LOG_LEVEL = "info"
+  SUPABASE_URL = "https://ioadobjuizywerkglqjy.supabase.co"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[http_service.checks]]
+  grace_period = "30s"
+  interval = "30s"
+  method = "GET"
+  timeout = "10s"
+  path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
+  cpus = 1
+  cpu_kind = "shared"
