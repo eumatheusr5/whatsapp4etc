@@ -63,9 +63,9 @@ export function MessageBubble({ msg, contactJid }: { msg: MessageRow; contactJid
 
   if (msg.deleted_at) {
     return (
-      <div className={cn('px-4 py-1', msg.from_me ? 'flex justify-end' : 'flex justify-start')}>
-        <div className="text-xs italic bg-wa-bubble dark:bg-wa-bubble-dark text-wa-muted px-3 py-2 rounded-lg">
-          🚫 Mensagem apagada
+      <div className={cn('px-3 sm:px-4 py-0.5', msg.from_me ? 'flex justify-end' : 'flex justify-start')}>
+        <div className="text-xs italic bg-surface text-text-subtle px-3 py-2 rounded-lg border border-border">
+          Mensagem apagada
         </div>
       </div>
     );
@@ -73,23 +73,23 @@ export function MessageBubble({ msg, contactJid }: { msg: MessageRow; contactJid
 
   const align = msg.from_me ? 'items-end' : 'items-start';
   const bubbleColor = msg.from_me
-    ? 'bg-wa-bubble-out dark:bg-wa-bubble-out-dark'
-    : 'bg-wa-bubble dark:bg-wa-bubble-dark';
+    ? 'bg-bubble-out text-text'
+    : 'bg-bubble-in text-text border border-border';
 
   return (
     <div
-      className={cn('px-4 py-1 flex flex-col group', align)}
+      className={cn('px-2 sm:px-4 py-0.5 flex flex-col group', align)}
       onMouseEnter={() => setShowActions(true)}
       onMouseLeave={() => setShowActions(false)}
     >
-      <div className={cn('relative max-w-[78%] md:max-w-[65%]', bubbleColor, 'rounded-lg shadow-sm px-3 py-2')}>
+      <div className={cn('relative max-w-[85%] sm:max-w-[78%] md:max-w-[65%]', bubbleColor, 'rounded-2xl shadow-soft px-3 py-2')}>
         {msg.forwarded && (
-          <div className="text-xs text-wa-muted italic mb-1 flex items-center gap-1">
+          <div className="text-xs text-text-muted italic mb-1 flex items-center gap-1">
             ↪ Encaminhada
           </div>
         )}
         {msg.sent_via === 'phone' && (
-          <div className="text-[10px] text-wa-muted flex items-center gap-1 mb-1">
+          <div className="text-[10px] text-text-muted flex items-center gap-1 mb-1">
             <Smartphone className="w-3 h-3" /> Enviado pelo celular
           </div>
         )}
@@ -105,16 +105,16 @@ export function MessageBubble({ msg, contactJid }: { msg: MessageRow; contactJid
         )}
 
         <div className="flex items-center justify-end gap-1 mt-1">
-          {msg.edited_at && <span className="text-[10px] text-wa-muted">editada</span>}
-          <span className="text-[10px] text-wa-muted">{formatTime(msg.wa_timestamp)}</span>
+          {msg.edited_at && <span className="text-[10px] text-text-subtle">editada</span>}
+          <span className="text-[10px] text-text-subtle">{formatTime(msg.wa_timestamp)}</span>
           {msg.from_me && <StatusIcon status={msg.status} />}
         </div>
 
         {msg.reactions?.length > 0 && (
-          <div className="absolute -bottom-3 right-2 bg-wa-bubble dark:bg-wa-bubble-dark border border-wa-divider dark:border-wa-divider-dark rounded-full px-2 py-0.5 shadow text-xs flex items-center gap-0.5">
+          <div className="absolute -bottom-3 right-2 bg-surface border border-border rounded-full px-2 py-0.5 shadow-soft text-xs flex items-center gap-0.5">
             {Array.from(new Set(msg.reactions.map((r) => r.emoji))).slice(0, 4).join('')}
             {msg.reactions.length > 1 && (
-              <span className="text-[10px] text-wa-muted ml-1">{msg.reactions.length}</span>
+              <span className="text-[10px] text-text-muted ml-1">{msg.reactions.length}</span>
             )}
           </div>
         )}
@@ -122,8 +122,8 @@ export function MessageBubble({ msg, contactJid }: { msg: MessageRow; contactJid
         {showActions && (
           <div
             className={cn(
-              'absolute top-0 flex items-center gap-1 transition-opacity',
-              msg.from_me ? '-left-20' : '-right-20',
+              'absolute top-0 hidden sm:flex items-center gap-1 transition-opacity',
+              msg.from_me ? '-left-16' : '-right-16',
             )}
           >
             <ReactionPicker onPick={(e) => react.mutate(e)} />
@@ -132,7 +132,7 @@ export function MessageBubble({ msg, contactJid }: { msg: MessageRow; contactJid
                 onClick={() => {
                   if (confirm('Apagar esta mensagem para todos?')) remove.mutate();
                 }}
-                className="p-1.5 bg-wa-bubble dark:bg-wa-bubble-dark border border-wa-divider dark:border-wa-divider-dark rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40"
+                className="p-1.5 bg-surface border border-border rounded-full text-danger hover:bg-danger-soft"
                 title="Apagar"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -151,12 +151,12 @@ function ReactionPicker({ onPick }: { onPick: (e: string) => void }) {
     <div className="relative">
       <button
         onClick={() => setOpen((x) => !x)}
-        className="p-1.5 bg-wa-bubble dark:bg-wa-bubble-dark border border-wa-divider dark:border-wa-divider-dark rounded-full hover:bg-wa-divider dark:hover:bg-wa-divider-dark"
+        className="p-1.5 bg-surface border border-border rounded-full hover:bg-surface-2 text-text-muted"
       >
         <Smile className="w-3.5 h-3.5" />
       </button>
       {open && (
-        <div className="absolute z-10 bottom-full mb-1 left-1/2 -translate-x-1/2 bg-wa-bubble dark:bg-wa-bubble-dark border border-wa-divider dark:border-wa-divider-dark rounded-full px-2 py-1 shadow-lg flex gap-1 animate-fade-in">
+        <div className="absolute z-10 bottom-full mb-1 left-1/2 -translate-x-1/2 bg-surface border border-border rounded-full px-2 py-1 shadow-pop flex gap-1 animate-fade-in">
           {QUICK_REACTIONS.map((e) => (
             <button
               key={e}
@@ -214,7 +214,7 @@ function MessageContent({ msg }: { msg: MessageRow }) {
         href={msg.media_url}
         target="_blank"
         rel="noopener"
-        className="flex items-center gap-2 text-sm bg-wa-divider dark:bg-wa-divider-dark p-2 rounded hover:underline"
+        className="flex items-center gap-2 text-sm bg-surface-2 p-2 rounded-lg hover:underline text-text"
       >
         📎 {msg.body || 'documento'}
       </a>
@@ -240,7 +240,7 @@ function MessageContent({ msg }: { msg: MessageRow }) {
       return <span>📍 Localização</span>;
     }
   }
-  return <span className="text-sm italic text-wa-muted">{msg.type}</span>;
+  return <span className="text-sm italic text-text-muted">{msg.type}</span>;
 }
 
 function TranscriptBox({
@@ -254,14 +254,14 @@ function TranscriptBox({
 }) {
   if (msg.transcript_status === 'skipped') return null;
   return (
-    <div className="mt-2 border-t border-wa-divider dark:border-wa-divider-dark pt-2">
+    <div className="mt-2 border-t border-border pt-2">
       <button
         onClick={onToggle}
-        className="flex items-center gap-1.5 text-xs text-wa-muted hover:text-wa-text dark:hover:text-wa-text-dark"
+        className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text"
       >
         <Languages className="w-3 h-3" />
         {msg.transcript_status === 'pending' || msg.transcript_status === 'processing'
-          ? 'Transcrevendo...'
+          ? 'Transcrevendo…'
           : msg.transcript_status === 'failed'
             ? 'Falha na transcrição'
             : expanded
@@ -269,18 +269,18 @@ function TranscriptBox({
               : 'Ver transcrição'}
       </button>
       {expanded && msg.transcript && (
-        <p className="text-xs italic mt-1 text-wa-muted whitespace-pre-wrap">{msg.transcript}</p>
+        <p className="text-xs italic mt-1 text-text-muted whitespace-pre-wrap">{msg.transcript}</p>
       )}
     </div>
   );
 }
 
 function StatusIcon({ status }: { status: MessageRow['status'] }) {
-  if (status === 'pending') return <Clock className="w-3 h-3 text-wa-muted" />;
-  if (status === 'failed') return <span className="text-red-500 text-xs">!</span>;
-  if (status === 'sent') return <Check className="w-3 h-3 text-wa-muted" />;
-  if (status === 'delivered') return <CheckCheck className="w-3 h-3 text-wa-muted" />;
-  if (status === 'read') return <CheckCheck className="w-3 h-3 text-blue-500" />;
+  if (status === 'pending') return <Clock className="w-3 h-3 text-text-subtle" />;
+  if (status === 'failed') return <span className="text-danger text-xs">!</span>;
+  if (status === 'sent') return <Check className="w-3 h-3 text-text-subtle" />;
+  if (status === 'delivered') return <CheckCheck className="w-3 h-3 text-text-subtle" />;
+  if (status === 'read') return <CheckCheck className="w-3 h-3 text-info" />;
   return null;
 }
 

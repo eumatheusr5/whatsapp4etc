@@ -55,14 +55,7 @@ export function MessagesList({
   const items = withDayDividers(messages);
 
   return (
-    <div
-      className="flex-1 min-h-0 relative"
-      style={{
-        backgroundImage:
-          "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><circle cx='1' cy='1' r='1' fill='%23000' opacity='0.04'/></svg>\")",
-        backgroundRepeat: 'repeat',
-      }}
-    >
+    <div className="flex-1 min-h-0 relative bg-bg">
       <Virtuoso
         ref={virtuosoRef}
         data={items}
@@ -75,7 +68,7 @@ export function MessagesList({
           if (item.kind === 'divider') {
             return (
               <div className="flex justify-center py-3">
-                <span className="text-xs bg-wa-bubble dark:bg-wa-bubble-dark text-wa-muted px-3 py-1 rounded-full shadow-sm">
+                <span className="text-[11px] bg-surface text-text-muted px-3 py-1 rounded-full shadow-soft border border-border">
                   {item.label}
                 </span>
               </div>

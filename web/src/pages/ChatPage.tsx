@@ -1,13 +1,24 @@
-import { useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { MessageCircle } from 'lucide-react';
 import { ConversationsList } from '../features/conversations/ConversationsList';
 import { ConversationView } from '../features/conversations/ConversationView';
-import { useEffect } from 'react';
 import { getSocket } from '../lib/socket';
-import { useQueryClient } from '@tanstack/react-query';
+import { useChatBreakpoint } from '../hooks/useChatPanels';
 
 export function ChatPage() {
   const { conversationId } = useParams<{ conversationId?: string }>();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const bp = useChatBreakpoint();
+  const [showDetails, setShowDetails] = useState(false);
+
+  // Em desktop large, mantém detalhes abertos por padrão
+  useEffect(() => {
+    if (bp === 'lg') setShowDetails(true);
+    else setShowDetails(false);
+  }, [bp]);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,6 +48,15 @@ export function ChatPage() {
       sock.on('conversation:assigned', onAssignChange);
       sock.on('conversation:released', onAssignChange);
       sock.on('conversation:read', onAssignChange);
+      const onContactDeleted = (payload: { contactId?: string }) => {
+        qc.invalidateQueries({ queryKey: ['conversations'] });
+        qc.invalidateQueries({ queryKey: ['contacts'] });
+        if (payload?.contactId && conversationId) {
+          // se a conversa atual é do contato deletado, navegar pra lista
+          navigate('/conversas');
+        }
+      };
+      sock.on('contact:deleted', onContactDeleted);
     })();
     return () => {
       cancelled = true;
@@ -48,37 +68,86 @@ export function ChatPage() {
         sock.off('conversation:assigned');
         sock.off('conversation:released');
         sock.off('conversation:read');
+        sock.off('contact:deleted');
       }
     };
-  }, [qc, conversationId]);
+  }, [qc, conversationId, navigate]);
 
+  // === MOBILE (sm) === stack: lista OR chat
+  if (bp === 'sm') {
+    return (
+      <div className="h-full bg-bg">
+        {conversationId ? (
+          <ConversationView
+            conversationId={conversationId}
+            showDetails={showDetails}
+            onToggleDetails={() => setShowDetails((v) => !v)}
+            onBack={() => navigate('/conversas')}
+            detailsAsPanel={false}
+          />
+        ) : (
+          <div className="h-full">
+            <ConversationsList selectedId={conversationId} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // === DESKTOP MD (768–1279): lista + chat (detalhes em modal) ===
+  if (bp === 'md') {
+    return (
+      <div className="h-full flex bg-bg">
+        <div className="w-[340px] shrink-0 border-r border-border">
+          <ConversationsList selectedId={conversationId} />
+        </div>
+        <div className="flex-1 min-w-0">
+          {conversationId ? (
+            <ConversationView
+              conversationId={conversationId}
+              showDetails={showDetails}
+              onToggleDetails={() => setShowDetails((v) => !v)}
+              detailsAsPanel={false}
+            />
+          ) : (
+            <EmptyChat />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // === DESKTOP LG (≥1280): lista + chat + detalhes ===
   return (
-    <div className="h-full flex">
-      <div className="w-[380px] shrink-0 border-r border-wa-divider dark:border-wa-divider-dark flex flex-col bg-wa-panel dark:bg-wa-panel-dark">
+    <div className="h-full flex bg-bg">
+      <div className="w-[360px] shrink-0 border-r border-border">
         <ConversationsList selectedId={conversationId} />
       </div>
-      <div className="flex-1 min-w-0 bg-wa-chat dark:bg-wa-chat-dark flex flex-col">
+      <div className="flex-1 min-w-0">
         {conversationId ? (
-          <ConversationView conversationId={conversationId} />
+          <ConversationView
+            conversationId={conversationId}
+            showDetails={showDetails}
+            onToggleDetails={() => setShowDetails((v) => !v)}
+            detailsAsPanel
+          />
         ) : (
-          <EmptyState />
+          <EmptyChat />
         )}
       </div>
     </div>
   );
 }
 
-function EmptyState() {
+function EmptyChat() {
   return (
-    <div className="h-full flex flex-col items-center justify-center text-wa-muted p-8">
-      <div className="w-32 h-32 rounded-full bg-wa-panel dark:bg-wa-bubble-dark flex items-center justify-center mb-6">
-        <svg className="w-16 h-16 text-wa-green-dark" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 2C6.48 2 2 6.48 2 12c0 1.85.5 3.58 1.38 5.06L2 22l4.94-1.38C8.42 21.5 10.15 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2z" />
-        </svg>
+    <div className="h-full flex flex-col items-center justify-center text-center px-8 py-10">
+      <div className="w-20 h-20 rounded-full bg-accent-soft text-accent flex items-center justify-center mb-5">
+        <MessageCircle className="w-10 h-10" />
       </div>
-      <h2 className="text-xl font-light mb-2">Selecione uma conversa</h2>
-      <p className="text-sm text-center max-w-md">
-        Escolha uma conversa ao lado para visualizar e responder mensagens dos seus clientes.
+      <h2 className="text-lg font-semibold text-text">Selecione uma conversa</h2>
+      <p className="text-sm text-text-muted mt-1.5 max-w-md">
+        Escolha um cliente na lista ao lado para visualizar e responder.
       </p>
     </div>
   );

@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, Filter, MessageCircle } from 'lucide-react';
+import { Search, MessageCircle, Inbox } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
 import { cn, formatPhone, formatTime } from '../../lib/format';
+import { Avatar, Badge, CountBadge, Input, Tabs, EmptyState, Skeleton } from '../../components/ui';
 
 interface ConversationListItem {
   id: string;
@@ -25,21 +26,16 @@ interface ConversationListItem {
   assignee?: { full_name: string } | null;
 }
 
-type Filter = 'all' | 'unread' | 'mine' | 'unassigned';
+type FilterId = 'all' | 'unread' | 'mine' | 'unassigned';
 
 export function ConversationsList({ selectedId }: { selectedId?: string }) {
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<Filter>('all');
+  const [filter, setFilter] = useState<FilterId>('all');
   const [me, setMe] = useState<string | null>(null);
 
-  useQuery({
-    queryKey: ['me'],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
-      setMe(data.user?.id ?? null);
-      return data.user;
-    },
-  });
+  useEffect(() => {
+    void supabase.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null));
+  }, []);
 
   const { data: conversations = [], isLoading } = useQuery<ConversationListItem[]>({
     queryKey: ['conversations'],
@@ -74,6 +70,12 @@ export function ConversationsList({ selectedId }: { selectedId?: string }) {
     },
   });
 
+  const counts = useMemo(() => {
+    const unread = conversations.filter((c) => c.unread_count > 0).length;
+    const mine = conversations.filter((c) => c.assigned_to === me).length;
+    return { unread, mine };
+  }, [conversations, me]);
+
   const filtered = useMemo(() => {
     let list = conversations;
     if (filter === 'unread') list = list.filter((c) => c.unread_count > 0);
@@ -96,71 +98,79 @@ export function ConversationsList({ selectedId }: { selectedId?: string }) {
   }, [conversations, filter, search, me]);
 
   return (
-    <>
-      <div className="h-14 px-4 flex items-center border-b border-wa-divider dark:border-wa-divider-dark">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <MessageCircle className="w-5 h-5" /> Conversas
-        </h2>
-      </div>
-
-      <div className="p-3 border-b border-wa-divider dark:border-wa-divider-dark space-y-2">
-        <div className="relative">
-          <Search className="w-4 h-4 absolute top-1/2 -translate-y-1/2 left-3 text-wa-muted" />
-          <input
-            type="text"
-            placeholder="Pesquisar..."
-            className="input pl-9"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+    <div className="h-full flex flex-col bg-surface">
+      <div className="px-4 pt-4 pb-3 border-b border-border">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-text">Conversas</h2>
+          {counts.unread > 0 && (
+            <Badge tone="accent" size="sm" dot>
+              {counts.unread} não lida{counts.unread > 1 ? 's' : ''}
+            </Badge>
+          )}
         </div>
-        <div className="flex gap-1">
-          {([
-            ['all', 'Todas'],
-            ['unread', 'Não lidas'],
-            ['mine', 'Minhas'],
-            ['unassigned', 'Livres'],
-          ] as Array<[Filter, string]>).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setFilter(key)}
-              className={cn(
-                'text-xs px-3 py-1 rounded-full transition-colors',
-                filter === key
-                  ? 'bg-wa-green-dark text-white'
-                  : 'bg-wa-divider dark:bg-wa-divider-dark text-wa-muted hover:text-wa-text dark:hover:text-wa-text-dark',
-              )}
-            >
-              {label}
-            </button>
-          ))}
+        <Input
+          iconLeft={<Search className="w-4 h-4" />}
+          placeholder="Pesquisar conversas…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div className="mt-3 -mx-1">
+          <Tabs
+            variant="pill"
+            size="sm"
+            value={filter}
+            onChange={(v) => setFilter(v as FilterId)}
+            items={[
+              { id: 'all', label: 'Todas' },
+              {
+                id: 'unread',
+                label: 'Não lidas',
+                badge: counts.unread > 0 ? <CountBadge count={counts.unread} /> : undefined,
+              },
+              {
+                id: 'mine',
+                label: 'Minhas',
+                badge: counts.mine > 0 ? <CountBadge count={counts.mine} /> : undefined,
+              },
+              { id: 'unassigned', label: 'Livres' },
+            ]}
+          />
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <div className="space-y-2 p-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-16 bg-wa-divider dark:bg-wa-divider-dark animate-pulse rounded-lg"
-              />
+          <div className="p-3 space-y-2">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 p-2">
+                <Skeleton className="w-11 h-11 rounded-full" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3 w-2/3" />
+                  <Skeleton className="h-3 w-full" />
+                </div>
+              </div>
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-8 text-center text-wa-muted text-sm">Nenhuma conversa</div>
+          <EmptyState
+            icon={<Inbox className="w-7 h-7" />}
+            title={search ? 'Nada encontrado' : 'Sem conversas aqui'}
+            description={search ? 'Tente outro termo de busca.' : 'Conversas novas aparecerão aqui.'}
+          />
         ) : (
-          filtered.map((conv) => (
-            <ConversationItem
-              key={conv.id}
-              conv={conv}
-              selected={conv.id === selectedId}
-              currentUserId={me}
-            />
-          ))
+          <ul className="py-1">
+            {filtered.map((conv) => (
+              <ConversationItem
+                key={conv.id}
+                conv={conv}
+                selected={conv.id === selectedId}
+                currentUserId={me}
+              />
+            ))}
+          </ul>
         )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -179,64 +189,58 @@ function ConversationItem({
     conv.contacts?.push_name ||
     phoneFmt ||
     'Sem nome';
-  const initials = name.slice(0, 2).toUpperCase();
   const isMine = conv.assigned_to === currentUserId;
   const isLockedByOther = conv.assigned_to && !isMine;
   const showPhone = phoneFmt && phoneFmt !== name;
 
   return (
-    <Link
-      to={`/conversas/${conv.id}`}
-      className={cn(
-        'flex items-center gap-3 px-3 py-3 border-b border-wa-divider dark:border-wa-divider-dark cursor-pointer hover:bg-wa-divider dark:hover:bg-wa-divider-dark transition-colors',
-        selected && 'bg-wa-divider dark:bg-wa-divider-dark',
-      )}
-    >
-      <div className="relative shrink-0">
-        {conv.contacts?.avatar_url ? (
-          <img
-            src={conv.contacts.avatar_url}
-            alt={name}
-            className="w-12 h-12 rounded-full object-cover"
-          />
-        ) : (
-          <div className="w-12 h-12 rounded-full bg-wa-green-dark text-white flex items-center justify-center text-sm font-medium">
-            {initials}
-          </div>
+    <li>
+      <Link
+        to={`/conversas/${conv.id}`}
+        className={cn(
+          'flex items-center gap-3 px-3 py-2.5 mx-1 rounded-lg cursor-pointer transition-colors',
+          selected
+            ? 'bg-accent-soft'
+            : 'hover:bg-surface-2',
         )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className="font-medium truncate">{name}</span>
-          <span className="text-xs text-wa-muted shrink-0">
-            {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
-          </span>
-        </div>
-        <div className="flex items-center justify-between gap-2 mt-0.5">
-          <span className="text-sm text-wa-muted truncate">
-            {conv.last_message_preview ?? '...'}
-          </span>
-          {conv.unread_count > 0 && (
-            <span className="bg-wa-green-dark text-white text-xs rounded-full min-w-[20px] h-5 px-1.5 flex items-center justify-center shrink-0">
-              {conv.unread_count > 99 ? '99+' : conv.unread_count}
+      >
+        <Avatar src={conv.contacts?.avatar_url} name={name} size="lg" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className={cn('font-semibold text-sm truncate', selected ? 'text-accent' : 'text-text')}>
+              {name}
             </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[11px] text-text-subtle shrink-0">
+              {conv.last_message_at ? formatTime(conv.last_message_at) : ''}
+            </span>
+          </div>
           {showPhone && (
-            <span className="text-[10px] text-wa-muted truncate">{phoneFmt}</span>
+            <p className="text-[11px] text-text-subtle truncate -mt-0.5">{phoneFmt}</p>
           )}
-          <span className="text-[10px] text-wa-muted">· {conv.instances?.name}</span>
-          {isLockedByOther && (
-            <span className="text-[10px] text-amber-600 truncate">
-              · {conv.assignee?.full_name || 'Em atendimento'}
+          <div className="flex items-center justify-between gap-2 mt-0.5">
+            <span className={cn(
+              'text-xs truncate',
+              conv.unread_count > 0 ? 'text-text font-medium' : 'text-text-muted',
+            )}>
+              {conv.last_message_preview ?? '—'}
             </span>
-          )}
-          {isMine && (
-            <span className="text-[10px] text-emerald-600 font-medium">· Sua</span>
-          )}
+            {conv.unread_count > 0 && <CountBadge count={conv.unread_count} />}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-1">
+            {conv.instances?.name && (
+              <span className="text-[10px] text-text-subtle truncate">{conv.instances.name}</span>
+            )}
+            {isLockedByOther && (
+              <Badge tone="warning" size="xs">
+                {conv.assignee?.full_name || 'Em atendimento'}
+              </Badge>
+            )}
+            {isMine && <Badge tone="success" size="xs">Sua</Badge>}
+          </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+    </li>
   );
 }
+
+export { MessageCircle };

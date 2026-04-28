@@ -142,4 +142,77 @@ export class ContactsService {
     const m = jid.match(/^(\d+)(?:[:\-]\d+)?@/);
     return m ? m[1] : null;
   }
+
+  /**
+   * Remove permanentemente um contato e todos os dados relacionados.
+   * - Lista todas as mensagens do contato (via conversations) e remove media do Storage em batches.
+   * - Remove o avatar do bucket avatars.
+   * - Deleta o contato; o cascade do Postgres remove conversations, messages, notes, tags.
+   */
+  async purge(contactId: string): Promise<void> {
+    const supabase = getSupabaseAdmin();
+
+    // 1. Lista paths de mídia das mensagens do contato (via conversations)
+    const { data: convs } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('contact_id', contactId);
+    const conversationIds = (convs ?? []).map((c) => c.id);
+
+    const mediaPaths: string[] = [];
+    if (conversationIds.length > 0) {
+      const PAGE = 500;
+      let offset = 0;
+      // paginar pra não estourar memória em conversas longas
+      while (true) {
+        const { data: msgs, error } = await supabase
+          .from('messages')
+          .select('media_path')
+          .in('conversation_id', conversationIds)
+          .not('media_path', 'is', null)
+          .range(offset, offset + PAGE - 1);
+        if (error) {
+          this.log.warn({ err: error, contactId }, 'falha ao listar mídia para purge');
+          break;
+        }
+        const paths = (msgs ?? [])
+          .map((m) => m.media_path as string | null)
+          .filter((p): p is string => !!p);
+        mediaPaths.push(...paths);
+        if (!msgs || msgs.length < PAGE) break;
+        offset += PAGE;
+      }
+    }
+
+    // 2. Remove arquivos do Storage em batches de 100 (limite do Supabase)
+    if (mediaPaths.length > 0) {
+      for (let i = 0; i < mediaPaths.length; i += 100) {
+        const batch = mediaPaths.slice(i, i + 100);
+        try {
+          await supabase.storage.from('media').remove(batch);
+        } catch (err) {
+          this.log.warn({ err, count: batch.length }, 'falha ao remover batch de mídia');
+        }
+      }
+    }
+
+    // 3. Remove avatar do contato (se houver)
+    try {
+      await supabase.storage.from('avatars').remove([`${contactId}.jpg`]);
+    } catch {
+      // ignore — pode não existir
+    }
+
+    // 4. Deleta o contato. Cascade do Postgres remove o resto.
+    const { error: delErr } = await supabase
+      .from('contacts')
+      .delete()
+      .eq('id', contactId);
+    if (delErr) throw delErr;
+
+    this.log.info(
+      { contactId, mediaCount: mediaPaths.length, conversations: conversationIds.length },
+      'contato purgado',
+    );
+  }
 }

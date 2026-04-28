@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   ParseUUIDPipe,
   Post,
@@ -20,6 +21,19 @@ const TypingSchema = z.object({ state: z.enum(['composing', 'paused']) });
 @UseGuards(JwtAuthGuard)
 export class ConversationsController {
   constructor(private readonly svc: ConversationsService) {}
+
+  @Get('unread-summary')
+  async unreadSummary(@CurrentUser() user: AuthUser) {
+    void user;
+    const supabase = getSupabaseAdmin();
+    const { count, error } = await supabase
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+      .gt('unread_count', 0)
+      .eq('archived', false);
+    if (error) throw error;
+    return { count: count ?? 0 };
+  }
 
   @Post(':id/assign')
   async assign(

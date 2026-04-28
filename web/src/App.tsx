@@ -21,8 +21,8 @@ const SettingsPage = lazy(() =>
 
 function PageFallback() {
   return (
-    <div className="h-full flex items-center justify-center text-wa-muted text-sm">
-      Carregando...
+    <div className="h-full flex items-center justify-center text-text-muted text-sm">
+      Carregando…
     </div>
   );
 }
@@ -31,7 +31,7 @@ function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useSession();
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center text-wa-muted">Carregando...</div>
+      <div className="h-full flex items-center justify-center text-text-muted">Carregando…</div>
     );
   }
   if (!session) return <Navigate to="/login" replace />;
@@ -50,17 +50,19 @@ function App() {
             <AppLayout>
               <Suspense fallback={<PageFallback />}>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/" element={<Navigate to="/inicio" replace />} />
+                  <Route path="/inicio" element={<DashboardPage />} />
                   <Route path="/conversas" element={<ChatPage />} />
                   <Route path="/conversas/:conversationId" element={<ChatPage />} />
                   <Route path="/contatos" element={<ContactsPage />} />
-                  <Route path="/instancias" element={<InstancesPage />} />
-                  {/* compatibilidade com link antigo */}
-                  <Route path="/saude" element={<Navigate to="/instancias?tab=saude" replace />} />
-                  <Route path="/estatisticas" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/numeros" element={<InstancesPage />} />
                   <Route path="/configuracoes" element={<SettingsPage />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                  {/* Compatibilidade com URLs antigas */}
+                  <Route path="/dashboard" element={<Navigate to="/inicio" replace />} />
+                  <Route path="/instancias" element={<Navigate to="/numeros" replace />} />
+                  <Route path="/saude" element={<Navigate to="/inicio" replace />} />
+                  <Route path="/estatisticas" element={<Navigate to="/inicio" replace />} />
+                  <Route path="*" element={<Navigate to="/inicio" replace />} />
                 </Routes>
               </Suspense>
             </AppLayout>

@@ -208,6 +208,10 @@ export class EventHandlersService {
       fromMe,
     });
 
+    if (!fromMe) {
+      this.realtime.emitAll('conversation:unread-changed', { conversationId });
+    }
+
     if (parsed.type === 'audio' || parsed.type === 'ptt') {
       void this.transcription.enqueue(inserted.id);
     }

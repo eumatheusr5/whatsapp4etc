@@ -18,6 +18,8 @@ import type { AuthUser } from '../auth/jwt.service';
 import { ZodValidationPipe } from '../../lib/zod-pipe';
 import { AppException, ErrCodes } from '../../lib/errors';
 import { getSupabaseAdmin } from '../../lib/supabase-admin';
+import { ContactsService } from './contacts.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 const UpdateContactSchema = z.object({
   customName: z.string().max(120).nullable().optional(),
@@ -32,6 +34,11 @@ const NoteSchema = z.object({
 @Controller('contacts')
 @UseGuards(JwtAuthGuard)
 export class ContactsController {
+  constructor(
+    private readonly svc: ContactsService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
+
   /**
    * Lista contatos com filtros opcionais.
    *  - search: substring em nome/push_name/phone_number
@@ -194,6 +201,45 @@ export class ContactsController {
       .eq('id', noteId)
       .eq('contact_id', id);
     if (error) throw error;
+    return { ok: true };
+  }
+
+  /**
+   * Exclui um contato permanentemente do sistema (não afeta o WhatsApp do celular).
+   * Remove em cascata via Postgres FK: conversations → messages, contact_notes, contact_tags.
+   * Limpa também os arquivos do Storage (mídia + avatar).
+   */
+  @Delete(':id')
+  async remove(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    const supabase = getSupabaseAdmin();
+    const { data: contact, error: selErr } = await supabase
+      .from('contacts')
+      .select('id, jid, push_name, custom_name')
+      .eq('id', id)
+      .maybeSingle();
+    if (selErr) throw selErr;
+    if (!contact) {
+      throw new AppException(ErrCodes.NOT_FOUND, 'Contato não encontrado', HttpStatus.NOT_FOUND);
+    }
+
+    await this.svc.purge(id);
+
+    await supabase.from('audit_log').insert({
+      user_id: user.id,
+      action: 'contact.delete',
+      entity: 'contact',
+      entity_id: id,
+      meta: {
+        jid: contact.jid,
+        push_name: contact.push_name,
+        custom_name: contact.custom_name,
+      },
+    } as never);
+
+    this.realtime.emitAll('contact:deleted', { contactId: id });
     return { ok: true };
   }
 }

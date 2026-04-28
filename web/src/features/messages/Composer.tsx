@@ -160,36 +160,37 @@ export function Composer({ conversationId, locked, assignedToOther, instanceStat
 
   if (locked) {
     return (
-      <div className="bg-wa-panel dark:bg-wa-panel-dark border-t border-wa-divider dark:border-wa-divider-dark p-4 text-center text-sm text-wa-muted">
-        🔒 Esta conversa está em atendimento por <strong>{assignedToOther}</strong>. Aguarde a liberação para responder.
+      <div className="bg-surface border-t border-border p-4 text-center text-sm text-text-muted safe-bottom">
+        Esta conversa está em atendimento por <strong className="text-text">{assignedToOther}</strong>. Aguarde a liberação para responder.
       </div>
     );
   }
 
   return (
-    <div className="bg-wa-panel dark:bg-wa-panel-dark border-t border-wa-divider dark:border-wa-divider-dark relative">
+    <div className="bg-surface border-t border-border relative safe-bottom">
       {offline && (
-        <div className="bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs px-4 py-1 text-center">
-          Instância desconectada. Mensagens enviadas serão enfileiradas no outbox.
+        <div className="bg-warning-soft text-warning-fg text-xs px-4 py-1.5 text-center">
+          Número desconectado. Mensagens enviadas serão enfileiradas até reconectar.
         </div>
       )}
-      <div className="p-3 flex items-end gap-2">
+      <div className="p-2.5 sm:p-3 flex items-end gap-1.5 sm:gap-2">
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowEmoji((x) => !x)}
-            className="p-2 hover:bg-wa-divider dark:hover:bg-wa-divider-dark rounded-full"
+            className="w-10 h-10 rounded-full text-text-muted hover:bg-surface-2 inline-flex items-center justify-center"
+            aria-label="Emoji"
           >
-            <Smile className="w-5 h-5 text-wa-muted" />
+            <Smile className="w-5 h-5" />
           </button>
           {showEmoji && (
-            <div className="absolute bottom-full left-0 mb-2 z-30">
+            <div className="absolute bottom-full left-0 mb-2 z-30 max-w-[92vw]">
               <EmojiPicker
                 onEmojiClick={(e) => setText((t) => t + e.emoji)}
                 emojiStyle={EmojiStyle.NATIVE}
                 theme={theme === 'dark' ? Theme.DARK : Theme.LIGHT}
-                width={320}
-                height={400}
+                width={Math.min(320, typeof window !== 'undefined' ? window.innerWidth - 24 : 320)}
+                height={380}
               />
             </div>
           )}
@@ -199,12 +200,13 @@ export function Composer({ conversationId, locked, assignedToOther, instanceStat
           <button
             type="button"
             onClick={() => setShowAttach((x) => !x)}
-            className="p-2 hover:bg-wa-divider dark:hover:bg-wa-divider-dark rounded-full"
+            className="w-10 h-10 rounded-full text-text-muted hover:bg-surface-2 inline-flex items-center justify-center"
+            aria-label="Anexar"
           >
-            <Paperclip className="w-5 h-5 text-wa-muted" />
+            <Paperclip className="w-5 h-5" />
           </button>
           {showAttach && (
-            <div className="absolute bottom-full left-0 mb-2 bg-wa-bubble dark:bg-wa-bubble-dark border border-wa-divider dark:border-wa-divider-dark rounded-xl shadow-lg overflow-hidden z-30 w-44">
+            <div className="absolute bottom-full left-0 mb-2 bg-surface border border-border rounded-xl shadow-pop overflow-hidden z-30 w-48">
               <AttachItem
                 icon={ImageIcon}
                 label="Imagem"
@@ -270,7 +272,7 @@ export function Composer({ conversationId, locked, assignedToOther, instanceStat
 
         <div className="flex-1 relative">
           <textarea
-            placeholder='Digite uma mensagem... (use "/" para respostas rápidas)'
+            placeholder='Mensagem ou "/" para respostas rápidas'
             value={text}
             onChange={(e) => {
               handleTypingChange(e.target.value);
@@ -283,7 +285,7 @@ export function Composer({ conversationId, locked, assignedToOther, instanceStat
               }
             }}
             rows={1}
-            className="input resize-none"
+            className="w-full px-3 py-2 bg-surface-2 border border-border rounded-2xl outline-none text-sm focus:border-accent focus:ring-2 focus:ring-accent/20 resize-none"
             style={{ minHeight: '40px', maxHeight: '120px' }}
           />
           {showQuickReplies && (
@@ -301,8 +303,8 @@ export function Composer({ conversationId, locked, assignedToOther, instanceStat
         {text.trim() ? (
           <button
             onClick={trySendText}
-            className="p-2.5 rounded-full bg-wa-green-dark text-white hover:bg-wa-green-darker"
-            title="Enviar"
+            className="w-10 h-10 rounded-full bg-accent text-accent-fg hover:bg-accent-hover inline-flex items-center justify-center shrink-0"
+            aria-label="Enviar"
           >
             <Send className="w-5 h-5" />
           </button>
@@ -310,12 +312,12 @@ export function Composer({ conversationId, locked, assignedToOther, instanceStat
           <button
             onClick={recording ? stopRecording : startRecording}
             className={cn(
-              'p-2.5 rounded-full',
+              'w-10 h-10 rounded-full inline-flex items-center justify-center shrink-0',
               recording
-                ? 'bg-red-500 text-white animate-pulse'
-                : 'hover:bg-wa-divider dark:hover:bg-wa-divider-dark text-wa-muted',
+                ? 'bg-danger text-danger-fg animate-pulse'
+                : 'text-text-muted hover:bg-surface-2',
             )}
-            title={recording ? 'Parar gravação' : 'Gravar áudio'}
+            aria-label={recording ? 'Parar gravação' : 'Gravar áudio'}
           >
             {recording ? <StopCircle className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
@@ -337,9 +339,9 @@ function AttachItem({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 px-4 py-3 w-full text-sm hover:bg-wa-divider dark:hover:bg-wa-divider-dark"
+      className="flex items-center gap-3 px-4 py-3 w-full text-sm hover:bg-surface-2 text-text"
     >
-      <Icon className="w-4 h-4 text-wa-muted" /> {label}
+      <Icon className="w-4 h-4 text-text-muted" /> {label}
     </button>
   );
 }
@@ -356,15 +358,15 @@ function QuickReplyDropdown({
   const matched = replies.filter((r) => r.shortcut.startsWith(filter)).slice(0, 6);
   if (matched.length === 0) return null;
   return (
-    <div className="absolute bottom-full left-0 mb-2 bg-wa-bubble dark:bg-wa-bubble-dark border border-wa-divider dark:border-wa-divider-dark rounded-xl shadow-lg overflow-hidden z-30 w-full max-w-md">
+    <div className="absolute bottom-full left-0 mb-2 bg-surface border border-border rounded-xl shadow-pop overflow-hidden z-30 w-full max-w-md">
       {matched.map((r) => (
         <button
           key={r.id}
           onClick={() => onPick(r)}
-          className="block text-left w-full px-4 py-2 hover:bg-wa-divider dark:hover:bg-wa-divider-dark"
+          className="block text-left w-full px-3 py-2 hover:bg-surface-2"
         >
-          <div className="text-xs font-mono text-wa-green-dark">{r.shortcut}</div>
-          <div className="text-sm truncate">{r.body}</div>
+          <div className="text-xs font-mono text-accent">{r.shortcut}</div>
+          <div className="text-sm text-text truncate">{r.body}</div>
         </button>
       ))}
     </div>

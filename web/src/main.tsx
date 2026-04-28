@@ -30,9 +30,18 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         </LightboxProvider>
         <Toaster
           position="top-right"
+          gutter={8}
           toastOptions={{
             duration: 3500,
-            style: { fontSize: '0.875rem' },
+            className:
+              '!bg-surface !text-text !border !border-border !shadow-pop !rounded-xl',
+            style: { fontSize: '0.875rem', padding: '10px 14px' },
+            success: {
+              iconTheme: { primary: 'rgb(var(--success))', secondary: '#fff' },
+            },
+            error: {
+              iconTheme: { primary: 'rgb(var(--danger))', secondary: '#fff' },
+            },
           }}
         />
       </BrowserRouter>

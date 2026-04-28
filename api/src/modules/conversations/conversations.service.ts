@@ -174,6 +174,7 @@ export class ConversationsService {
       .neq('status', 'read');
 
     this.realtime.emitAll('conversation:read', { conversationId, userId });
+    this.realtime.emitAll('conversation:unread-changed', { conversationId, unread: 0 });
   }
 
   async sendTyping(

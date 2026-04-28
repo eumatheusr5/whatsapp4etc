@@ -3,6 +3,83 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Tema claro - slate neutro */
+    --bg: 248 250 252;            /* slate-50 */
+    --surface: 255 255 255;       /* white */
+    --surface-2: 241 245 249;     /* slate-100 */
+    --surface-3: 226 232 240;     /* slate-200 */
+
+    --border: 226 232 240;        /* slate-200 */
+    --border-strong: 203 213 225; /* slate-300 */
+
+    --text: 15 23 42;             /* slate-900 */
+    --text-muted: 71 85 105;      /* slate-600 */
+    --text-subtle: 148 163 184;   /* slate-400 */
+
+    --accent: 0 168 132;          /* verde whatsapp */
+    --accent-hover: 0 134 105;
+    --accent-soft: 209 250 229;   /* emerald-100 */
+    --accent-fg: 255 255 255;
+
+    --danger: 239 68 68;          /* red-500 */
+    --danger-soft: 254 226 226;   /* red-100 */
+    --danger-fg: 255 255 255;
+
+    --warning: 245 158 11;        /* amber-500 */
+    --warning-soft: 254 243 199;  /* amber-100 */
+    --warning-fg: 120 53 15;      /* amber-900 */
+
+    --success: 16 185 129;        /* emerald-500 */
+    --success-soft: 209 250 229;  /* emerald-100 */
+    --success-fg: 6 78 59;        /* emerald-900 */
+
+    --info: 59 130 246;           /* blue-500 */
+    --info-soft: 219 234 254;     /* blue-100 */
+    --info-fg: 30 64 175;         /* blue-800 */
+
+    --bubble-in: 255 255 255;
+    --bubble-out: 217 253 211;    /* verde claro WhatsApp */
+  }
+
+  .dark {
+    --bg: 9 13 22;                /* zinc-950+ */
+    --surface: 17 24 39;          /* gray-900 */
+    --surface-2: 24 32 46;
+    --surface-3: 31 41 56;
+
+    --border: 39 51 70;
+    --border-strong: 60 78 105;
+
+    --text: 226 232 240;          /* slate-200 */
+    --text-muted: 148 163 184;    /* slate-400 */
+    --text-subtle: 100 116 139;   /* slate-500 */
+
+    --accent: 16 185 129;         /* emerald-500 */
+    --accent-hover: 5 150 105;
+    --accent-soft: 6 78 59;
+    --accent-fg: 255 255 255;
+
+    --danger: 248 113 113;
+    --danger-soft: 127 29 29;
+    --danger-fg: 254 226 226;
+
+    --warning: 251 191 36;
+    --warning-soft: 113 63 18;
+    --warning-fg: 254 243 199;
+
+    --success: 34 197 94;
+    --success-soft: 6 78 59;
+    --success-fg: 209 250 229;
+
+    --info: 96 165 250;
+    --info-soft: 30 58 138;
+    --info-fg: 219 234 254;
+
+    --bubble-in: 31 41 56;
+    --bubble-out: 6 78 59;
+  }
+
   html,
   body,
   #root {
@@ -10,11 +87,8 @@
   }
 
   body {
-    @apply font-sans bg-wa-panel text-wa-text;
-  }
-
-  .dark body {
-    @apply bg-wa-panel-dark text-wa-text-dark;
+    @apply font-sans bg-bg text-text antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   /* Scrollbar discreta */
@@ -26,30 +100,65 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-wa-divider rounded-full;
+    background: rgb(var(--border-strong) / 0.6);
+    border-radius: 9999px;
   }
-  .dark ::-webkit-scrollbar-thumb {
-    @apply bg-wa-divider-dark;
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--border-strong));
+  }
+
+  /* Focus visível em interativos */
+  :where(button, a, input, textarea, select, [role='button']):focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-bg;
+  }
+
+  /* iOS safe area */
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  }
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 0px);
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
 @layer components {
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors;
-  }
+  /* Shims para componentes legados que ainda usam classes antigas */
   .btn-primary {
-    @apply btn bg-wa-green-dark text-white hover:bg-wa-green-darker disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium rounded-lg bg-accent text-accent-fg hover:bg-accent-hover disabled:opacity-60 disabled:cursor-not-allowed transition-colors;
   }
   .btn-secondary {
-    @apply btn bg-white text-wa-text hover:bg-wa-divider border border-wa-divider;
-  }
-  .dark .btn-secondary {
-    @apply bg-wa-bubble-dark text-wa-text-dark border-wa-divider-dark hover:bg-wa-divider-dark;
+    @apply inline-flex items-center justify-center gap-2 h-10 px-4 text-sm font-medium rounded-lg bg-surface-2 text-text border border-border hover:bg-surface-3 disabled:opacity-60 disabled:cursor-not-allowed transition-colors;
   }
   .input {
-    @apply w-full px-3 py-2 text-sm bg-white border border-wa-divider rounded-lg outline-none focus:border-wa-green-dark transition-colors;
+    @apply h-10 w-full px-3 bg-surface text-text placeholder:text-text-subtle text-sm border border-border rounded-lg outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition-colors;
   }
-  .dark .input {
-    @apply bg-wa-bubble-dark border-wa-divider-dark text-wa-text-dark;
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .h-dvh {
+    height: 100vh;
+    height: 100dvh;
+  }
+  .min-h-dvh {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+  .text-balance {
+    text-wrap: balance;
   }
 }
