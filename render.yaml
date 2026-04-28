@@ -4,6 +4,7 @@ services:
     runtime: docker
     plan: starter
     region: sao
+    rootDir: api
     dockerfilePath: ./Dockerfile
     autoDeploy: true
     healthCheckPath: /health
