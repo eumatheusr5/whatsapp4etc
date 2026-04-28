@@ -1,4 +1,4 @@
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable, forwardRef } from '@nestjs/common';
 import { getSupabaseAdmin } from '../../lib/supabase-admin';
 import { AppException, ErrCodes } from '../../lib/errors';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
@@ -16,6 +16,7 @@ export class ConversationsService {
 
   constructor(
     private readonly realtime: RealtimeGateway,
+    @Inject(forwardRef(() => SessionManager))
     private readonly sessionManager: SessionManager,
   ) {}
 
