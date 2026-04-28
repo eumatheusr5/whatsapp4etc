@@ -1,0 +1,10 @@
+node_modules
+dist
+.env
+.env.local
+auth_info_baileys
+sessions
+*.log
+.git
+.gitignore
+README.md

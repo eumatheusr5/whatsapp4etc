@@ -1,0 +1,55 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply font-sans bg-wa-panel text-wa-text;
+  }
+
+  .dark body {
+    @apply bg-wa-panel-dark text-wa-text-dark;
+  }
+
+  /* Scrollbar discreta */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-wa-divider rounded-full;
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-wa-divider-dark;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors;
+  }
+  .btn-primary {
+    @apply btn bg-wa-green-dark text-white hover:bg-wa-green-darker disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply btn bg-white text-wa-text hover:bg-wa-divider border border-wa-divider;
+  }
+  .dark .btn-secondary {
+    @apply bg-wa-bubble-dark text-wa-text-dark border-wa-divider-dark hover:bg-wa-divider-dark;
+  }
+  .input {
+    @apply w-full px-3 py-2 text-sm bg-white border border-wa-divider rounded-lg outline-none focus:border-wa-green-dark transition-colors;
+  }
+  .dark .input {
+    @apply bg-wa-bubble-dark border-wa-divider-dark text-wa-text-dark;
+  }
+}
