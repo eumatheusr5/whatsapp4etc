@@ -1,12 +1,31 @@
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { ChatPage } from './pages/ChatPage';
-import { InstancesPage } from './pages/InstancesPage';
-import { StatsPage } from './pages/StatsPage';
-import { HealthPage } from './pages/HealthPage';
 import { AppLayout } from './layouts/AppLayout';
 import { useSession } from './lib/auth';
 import { useThemeBootstrap } from './lib/theme';
+
+const DashboardPage = lazy(() =>
+  import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })),
+);
+const ContactsPage = lazy(() =>
+  import('./pages/ContactsPage').then((m) => ({ default: m.ContactsPage })),
+);
+const InstancesPage = lazy(() =>
+  import('./pages/InstancesPage').then((m) => ({ default: m.InstancesPage })),
+);
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+);
+
+function PageFallback() {
+  return (
+    <div className="h-full flex items-center justify-center text-wa-muted text-sm">
+      Carregando...
+    </div>
+  );
+}
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { session, loading } = useSession();
@@ -29,15 +48,21 @@ function App() {
         element={
           <Protected>
             <AppLayout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/conversas" replace />} />
-                <Route path="/conversas" element={<ChatPage />} />
-                <Route path="/conversas/:conversationId" element={<ChatPage />} />
-                <Route path="/instancias" element={<InstancesPage />} />
-                <Route path="/saude" element={<HealthPage />} />
-                <Route path="/estatisticas" element={<StatsPage />} />
-                <Route path="*" element={<Navigate to="/conversas" replace />} />
-              </Routes>
+              <Suspense fallback={<PageFallback />}>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                  <Route path="/conversas" element={<ChatPage />} />
+                  <Route path="/conversas/:conversationId" element={<ChatPage />} />
+                  <Route path="/contatos" element={<ContactsPage />} />
+                  <Route path="/instancias" element={<InstancesPage />} />
+                  {/* compatibilidade com link antigo */}
+                  <Route path="/saude" element={<Navigate to="/instancias?tab=saude" replace />} />
+                  <Route path="/estatisticas" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/configuracoes" element={<SettingsPage />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </Suspense>
             </AppLayout>
           </Protected>
         }

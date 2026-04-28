@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useMutation } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { cn, formatTime } from '../../lib/format';
+import { useLightbox } from '../../components/LightboxProvider';
 
 export interface MessageRow {
   id: string;
@@ -175,6 +176,7 @@ function ReactionPicker({ onPick }: { onPick: (e: string) => void }) {
 }
 
 function MessageContent({ msg }: { msg: MessageRow }) {
+  const lightbox = useLightbox();
   if (msg.type === 'text') {
     return <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>;
   }
@@ -183,9 +185,13 @@ function MessageContent({ msg }: { msg: MessageRow }) {
       <div>
         <img
           src={msg.media_url}
-          alt="imagem"
-          className="rounded max-w-full max-h-80 cursor-pointer object-cover"
-          onClick={() => window.open(msg.media_url!, '_blank')}
+          alt={msg.body || 'imagem'}
+          className="rounded max-w-full max-h-80 cursor-zoom-in object-cover"
+          onClick={() =>
+            lightbox.open({
+              images: [{ url: msg.media_url!, caption: msg.body }],
+            })
+          }
         />
         {msg.body && <p className="text-sm mt-1 whitespace-pre-wrap break-words">{msg.body}</p>}
       </div>

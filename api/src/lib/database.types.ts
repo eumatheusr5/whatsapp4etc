@@ -549,6 +549,7 @@ export type Database = {
           created_at: string;
           full_name: string;
           id: string;
+          is_active: boolean;
           is_online: boolean;
           last_seen_at: string | null;
           role: string;
@@ -559,6 +560,7 @@ export type Database = {
           created_at?: string;
           full_name?: string;
           id: string;
+          is_active?: boolean;
           is_online?: boolean;
           last_seen_at?: string | null;
           role?: string;
@@ -569,6 +571,7 @@ export type Database = {
           created_at?: string;
           full_name?: string;
           id?: string;
+          is_active?: boolean;
           is_online?: boolean;
           last_seen_at?: string | null;
           role?: string;

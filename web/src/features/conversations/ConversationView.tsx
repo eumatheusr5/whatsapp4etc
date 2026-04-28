@@ -86,12 +86,14 @@ export function ConversationView({ conversationId }: { conversationId: string })
 
   if (!conv) return null;
 
+  const phoneFmt = formatPhone(conv.contact?.phone_number ?? conv.contact?.jid ?? null);
   const name =
-    conv.contact?.custom_name || conv.contact?.push_name || formatPhone(conv.contact?.phone_number ?? null);
+    conv.contact?.custom_name || conv.contact?.push_name || phoneFmt || '?';
   const initials = name.slice(0, 2).toUpperCase();
   const isMine = conv.assigned_to === me;
   const isLockedByOther = !!conv.assigned_to && !isMine;
   const presenceText = getPresenceText(conv.contact);
+  const showPhoneLine = phoneFmt && phoneFmt !== name;
 
   return (
     <div className="h-full flex">
@@ -119,9 +121,20 @@ export function ConversationView({ conversationId }: { conversationId: string })
               </div>
             )}
             <div className="text-left min-w-0">
-              <div className="font-medium truncate">{name}</div>
+              <div className="font-medium truncate flex items-center gap-2">
+                <span className="truncate">{name}</span>
+                {showPhoneLine && (
+                  <span className="hidden sm:inline text-xs font-normal text-wa-muted truncate">
+                    {phoneFmt}
+                  </span>
+                )}
+              </div>
               <div className="text-xs text-wa-muted truncate">
-                {presenceText} · {conv.instance.name}
+                {showPhoneLine && (
+                  <span className="sm:hidden mr-2">{phoneFmt} ·</span>
+                )}
+                {presenceText ? `${presenceText} · ` : ''}
+                {conv.instance.name}
               </div>
             </div>
           </button>

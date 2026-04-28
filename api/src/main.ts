@@ -8,20 +8,48 @@ import { getConfig } from './lib/config';
 import { logger } from './lib/logger';
 import { initSentry } from './lib/sentry';
 
+type CorsCallback = (err: Error | null, allow?: boolean) => void;
+
+function buildOriginValidator(webOrigin: string) {
+  const allowedExact = new Set<string>([
+    webOrigin,
+    'http://localhost:5173',
+    'http://localhost:4173',
+    'http://127.0.0.1:5173',
+  ]);
+  const allowedPatterns = [
+    /^https:\/\/[a-z0-9-]+\.vercel\.app$/i,
+    /^https:\/\/[a-z0-9-]+\.onrender\.com$/i,
+  ];
+  return (origin: string | undefined, cb: CorsCallback) => {
+    if (!origin) return cb(null, true);
+    if (allowedExact.has(origin)) return cb(null, true);
+    if (allowedPatterns.some((p) => p.test(origin))) return cb(null, true);
+    logger.warn({ origin }, 'CORS bloqueado para origin');
+    cb(new Error(`Origin não permitido: ${origin}`));
+  };
+}
+
 class CorsIoAdapter extends IoAdapter {
-  constructor(app: any, private readonly origin: string) {
-    super(app);
+  private readonly validator: ReturnType<typeof buildOriginValidator>;
+
+  constructor(app: unknown, validator: ReturnType<typeof buildOriginValidator>) {
+    super(app as never);
+    this.validator = validator;
   }
+
   override createIOServer(port: number, options?: ServerOptions): Server {
-    const server: Server = super.createIOServer(port, {
+    const opts = {
       ...options,
       cors: {
-        origin: [this.origin, /\.vercel\.app$/, 'http://localhost:5173'],
+        origin: this.validator,
         credentials: true,
       },
       transports: ['websocket', 'polling'],
-    });
-    return server;
+      pingTimeout: 30_000,
+      pingInterval: 25_000,
+    } as ServerOptions;
+    return super.createIOServer(port, opts) as Server;
   }
 }
 
@@ -35,9 +63,14 @@ async function bootstrap() {
     bodyParser: true,
   });
 
+  const validator = buildOriginValidator(cfg.WEB_ORIGIN);
+
   app.enableCors({
-    origin: [cfg.WEB_ORIGIN, /\.vercel\.app$/, 'http://localhost:5173'],
+    origin: validator,
     credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Accept', 'X-Requested-With'],
+    maxAge: 86400,
   });
 
   app.useGlobalPipes(
@@ -48,12 +81,12 @@ async function bootstrap() {
     }),
   );
 
-  app.useWebSocketAdapter(new CorsIoAdapter(app, cfg.WEB_ORIGIN));
+  app.useWebSocketAdapter(new CorsIoAdapter(app, validator));
 
   app.enableShutdownHooks();
 
   await app.listen(cfg.PORT, '0.0.0.0');
-  logger.info({ port: cfg.PORT, env: cfg.NODE_ENV }, 'API up');
+  logger.info({ port: cfg.PORT, env: cfg.NODE_ENV, webOrigin: cfg.WEB_ORIGIN }, 'API up');
 }
 
 bootstrap().catch((err) => {

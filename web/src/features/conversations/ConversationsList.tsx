@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, Filter, MessageCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../../lib/supabase';
-import { cn, formatTime } from '../../lib/format';
+import { cn, formatPhone, formatTime } from '../../lib/format';
 
 interface ConversationListItem {
   id: string;
@@ -173,14 +173,16 @@ function ConversationItem({
   selected: boolean;
   currentUserId: string | null;
 }) {
+  const phoneFmt = formatPhone(conv.contacts?.phone_number ?? null);
   const name =
     conv.contacts?.custom_name ||
     conv.contacts?.push_name ||
-    conv.contacts?.phone_number ||
+    phoneFmt ||
     'Sem nome';
   const initials = name.slice(0, 2).toUpperCase();
   const isMine = conv.assigned_to === currentUserId;
   const isLockedByOther = conv.assigned_to && !isMine;
+  const showPhone = phoneFmt && phoneFmt !== name;
 
   return (
     <Link
@@ -221,7 +223,10 @@ function ConversationItem({
           )}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-wa-muted">{conv.instances?.name}</span>
+          {showPhone && (
+            <span className="text-[10px] text-wa-muted truncate">{phoneFmt}</span>
+          )}
+          <span className="text-[10px] text-wa-muted">· {conv.instances?.name}</span>
           {isLockedByOther && (
             <span className="text-[10px] text-amber-600 truncate">
               · {conv.assignee?.full_name || 'Em atendimento'}

@@ -10,7 +10,7 @@ interface AuthedSocket extends Socket {
 }
 
 @Injectable()
-@WebSocketGateway({ namespace: '/', cors: { origin: '*', credentials: true } })
+@WebSocketGateway({ namespace: '/', transports: ['websocket', 'polling'] })
 export class RealtimeGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;

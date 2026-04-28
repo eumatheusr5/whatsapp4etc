@@ -25,15 +25,18 @@ export function ChatPage() {
       sock.on('message:updated', onMsg);
       sock.on('message:reaction', onMsg);
       sock.on('message:transcript_done', onMsg);
-      sock.on('conversation:assigned', () => {
+      const onAssignChange = (payload: { conversationId?: string }) => {
         qc.invalidateQueries({ queryKey: ['conversations'] });
-      });
-      sock.on('conversation:released', () => {
-        qc.invalidateQueries({ queryKey: ['conversations'] });
-      });
-      sock.on('conversation:read', () => {
-        qc.invalidateQueries({ queryKey: ['conversations'] });
-      });
+        if (payload?.conversationId) {
+          qc.invalidateQueries({ queryKey: ['conversation', payload.conversationId] });
+        }
+        if (conversationId) {
+          qc.invalidateQueries({ queryKey: ['conversation', conversationId] });
+        }
+      };
+      sock.on('conversation:assigned', onAssignChange);
+      sock.on('conversation:released', onAssignChange);
+      sock.on('conversation:read', onAssignChange);
     })();
     return () => {
       cancelled = true;

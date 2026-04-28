@@ -14,6 +14,9 @@ import { TranscriptionModule } from './modules/transcription/transcription.modul
 import { OutboxModule } from './modules/outbox/outbox.module';
 import { PushModule } from './modules/push/push.module';
 import { StatsModule } from './modules/stats/stats.module';
+import { UsersModule } from './modules/users/users.module';
+import { TagsModule } from './modules/tags/tags.module';
+import { QuickRepliesModule } from './modules/quick-replies/quick-replies.module';
 
 @Module({
   imports: [
@@ -34,6 +37,9 @@ import { StatsModule } from './modules/stats/stats.module';
     OutboxModule,
     PushModule,
     StatsModule,
+    UsersModule,
+    TagsModule,
+    QuickRepliesModule,
   ],
   controllers: [HealthController],
 })

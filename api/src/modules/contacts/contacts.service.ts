@@ -138,7 +138,8 @@ export class ContactsService {
   }
 
   private extractPhone(jid: string): string | null {
-    const m = jid.match(/^(\d+)@/);
+    // Remove sufixo de device (ex: 5511999999999:42@s.whatsapp.net) e id de grupo (ex: 5511999999999-1234567@g.us)
+    const m = jid.match(/^(\d+)(?:[:\-]\d+)?@/);
     return m ? m[1] : null;
   }
 }

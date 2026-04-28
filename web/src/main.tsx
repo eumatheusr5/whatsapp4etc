@@ -6,13 +6,15 @@ import { Toaster } from 'react-hot-toast';
 import App from './App';
 import './index.css';
 import { initSentry } from './lib/sentry';
+import { LightboxProvider } from './components/LightboxProvider';
 
 initSentry();
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      staleTime: 60_000,
+      gcTime: 10 * 60_000,
       refetchOnWindowFocus: false,
       retry: 1,
     },
@@ -23,7 +25,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <LightboxProvider>
+          <App />
+        </LightboxProvider>
         <Toaster
           position="top-right"
           toastOptions={{
